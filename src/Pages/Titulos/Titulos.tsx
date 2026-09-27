@@ -1,4 +1,5 @@
 import { useAuth } from "../Login/useAuth";
+import { ROTULOS_PERFIL, type PerfilPessoa } from "../Pessoas/ConfigPessoas";
 import {Badge,Box,Button,Flex,Heading,Icon,Select,Text,VStack} from "@chakra-ui/react";
 import {Link as RouterLink,useLocation,useNavigate} from "react-router-dom";
 import {Building,Car,CarFront,DoorOpen,Home,LogOut,Users} from "lucide-react";
@@ -10,8 +11,6 @@ export const ROTAS = {
   VAGAS: "/Vagas",
   VEICULOS: "/Veiculos",
   PESSOA: "/Pessoas",
-  PROJETOS: "/Projetos",
-  TAREFAS: "/Tarefas",
   CONDOMINIOS: "/Condominios",
 } as const;
 
@@ -21,8 +20,6 @@ const DadosTitulos = {
   [ROTAS.VAGAS]: {titulo: "Vagas",descricao: "Vagas fixas e rotativas.",},
   [ROTAS.VEICULOS]: {titulo: "Veículos",descricao: "Veículos, vagas e condutores.",},
   [ROTAS.PESSOA]: {titulo: "Pessoas",descricao: "Moradores, prestadores e equipe.",},
-  [ROTAS.PROJETOS]: {titulo: "Projetos",descricao: "Projetos e obras do condomínio.",},
-  [ROTAS.TAREFAS]: {titulo: "Tarefas",descricao: "Tarefas vinculadas aos projetos.",},
   [ROTAS.CONDOMINIOS]: {titulo: "Condomínios",descricao: "Cadastro dos condomínios do sistema.",},
 };
 
@@ -63,7 +60,7 @@ export const Titulo = () => {
           ) : (
             <Text fontSize="sm" fontWeight="semibold" color="gray.800">{condominioAtual?.nome}</Text>
           )}
-          {condominioAtual && <Badge marginTop={2} colorScheme="blue">{condominioAtual.perfil}</Badge>}
+          {condominioAtual && <Badge marginTop={2} colorScheme="blue" textTransform="none">{condominioAtual.perfil === "ADM" ? "Administrador" : ROTULOS_PERFIL[condominioAtual.perfil as PerfilPessoa]}</Badge>}
         </Box>
       )}
 

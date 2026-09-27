@@ -1,5 +1,4 @@
-import type { ElementType } from "react";
-import { Flex, createIcon } from "@chakra-ui/react";
+import { createIcon } from "@chakra-ui/react";
 
 const traco = { fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round" as const, strokeLinejoin: "round" as const};
 export const IconePredio = createIcon({ displayName: "IconePredio", viewBox: "0 0 24 24", defaultProps: traco, path: (
@@ -62,11 +61,3 @@ export const IconeUsuario = createIcon({  displayName: "IconeUsuario",  viewBox:
       <circle cx="12" cy="7" r="4" />
     </>
 )});
-
-/* Quadradinho colorido que abriga um ícone */
-export const IconeTile = ({  icone: Icone,  cor = "blue",  tamanho = 10,}: {  icone: ElementType;  cor?: string;  tamanho?: number}) => (
-  <Flex align="center" justify="center" flexShrink={0} boxSize={tamanho} borderRadius="lg" bg={cor === "gray" ? "white" : `${cor}.50`}
-    color={`${cor}.500`} border="1px solid" borderColor={cor === "gray" ? "gray.100" : "transparent"}  >
-    <Icone boxSize={tamanho > 8 ? 5 : 4} />
-  </Flex>
-);

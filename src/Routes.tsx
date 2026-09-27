@@ -5,8 +5,6 @@ import { useAuth } from "./Pages/Login/useAuth";
 import { Dashboard } from "./Pages/Home/Inicio";
 import { Login } from "./Pages/Login/Login";
 import { Pessoas } from "./Pages/Pessoas/Pessoas";
-import { CriarProjeto as Projetos } from "./Pages/Projetos/Projetos";
-import { Tarefas } from "./Pages/Tarefas/CriarTarefa";
 import { Condominios } from "./Pages/Condominios/Condominios";
 import { Apartamentos } from "./Pages/Apartamentos/Apartamentos";
 import { ApartamentoPagina } from "./Pages/Apartamentos/ApartamentoPagina";
@@ -103,16 +101,6 @@ export const RoutesApp = () => {
         <Route
           path={ROTAS.PESSOA}
           element={<Protected Item={Pessoas} exigeCondominio />}
-        />
-
-        <Route
-          path={ROTAS.PROJETOS}
-          element={<Protected Item={Projetos} exigeCondominio />}
-        />
-
-        <Route
-          path={ROTAS.TAREFAS}
-          element={<Protected Item={Tarefas} exigeCondominio />}
         />
 
         <Route

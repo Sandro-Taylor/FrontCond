@@ -7,7 +7,7 @@ import type { ValuesInputType } from "./helper";
 import { API_BASE_URL_USERS } from "../../config";
 import { definirCondominioAtual, obterCondominioAtual } from "../../Components/config";
 
-export type Perfil = "ADM" | "SINDICO" | "CONSELHEIRO" | "MORADOR" | "COLABORADOR";
+export type Perfil = "ADM" | "SINDICO" | "CONSELHEIRO" | "MORADOR" | "COLABORADOR" | "PRESTADOR";
 
 export type CondominioDoUsuario = {
   id: string;

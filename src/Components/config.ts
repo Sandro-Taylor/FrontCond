@@ -34,10 +34,6 @@ export function formatarData(data: string) {
   return new Date(data).toLocaleDateString("pt-BR", { timeZone: FUSO });
 }
 
-export function formatarDataHora(data: string) {
-  return new Date(data).toLocaleString("pt-BR", { timeZone: FUSO });
-}
-
 // MÁSCARAS (o banco guarda sem máscara; a tela mostra com máscara)
 export function somenteNumeros(valor: string) {
   return valor.replace(/\D/g, "");
