@@ -1,11 +1,14 @@
 import { useAuth } from "../Login/useAuth";
 import {Badge,Box,Button,Flex,Heading,Icon,Select,Text,VStack} from "@chakra-ui/react";
 import {Link as RouterLink,useLocation,useNavigate} from "react-router-dom";
-import {Building,Home,LogOut,Users,ClipboardList,FolderKanban,} from "lucide-react";
+import {Building,Car,CarFront,DoorOpen,Home,LogOut,Users} from "lucide-react";
 
 export const ROTAS = {
   INICIO: "/",
   LOGIN: "/login",
+  APARTAMENTOS: "/Apartamentos",
+  VAGAS: "/Vagas",
+  VEICULOS: "/Veiculos",
   PESSOA: "/Pessoas",
   PROJETOS: "/Projetos",
   TAREFAS: "/Tarefas",
@@ -14,7 +17,10 @@ export const ROTAS = {
 
 const DadosTitulos = {
   [ROTAS.INICIO]: {titulo: "Dashboard",descricao: "Visão geral do condomínio."},
-  [ROTAS.PESSOA]: {titulo: "Pessoas",descricao: "Cadastro e gerenciamento de pessoas.",},
+  [ROTAS.APARTAMENTOS]: {titulo: "Apartamentos",descricao: "Unidades, moradores, vagas e veículos.",},
+  [ROTAS.VAGAS]: {titulo: "Vagas",descricao: "Vagas fixas e rotativas.",},
+  [ROTAS.VEICULOS]: {titulo: "Veículos",descricao: "Veículos, vagas e condutores.",},
+  [ROTAS.PESSOA]: {titulo: "Pessoas",descricao: "Moradores, prestadores e equipe.",},
   [ROTAS.PROJETOS]: {titulo: "Projetos",descricao: "Projetos e obras do condomínio.",},
   [ROTAS.TAREFAS]: {titulo: "Tarefas",descricao: "Tarefas vinculadas aos projetos.",},
   [ROTAS.CONDOMINIOS]: {titulo: "Condomínios",descricao: "Cadastro dos condomínios do sistema.",},
@@ -24,7 +30,12 @@ export const Titulo = () => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { user, logout, condominioAtual, trocarCondominio } = useAuth();
-  const pagina = DadosTitulos[pathname as keyof typeof DadosTitulos];
+  // página exata ou subpágina (ex.: /Apartamentos/123 usa o título de /Apartamentos)
+  const chave = (Object.keys(DadosTitulos) as (keyof typeof DadosTitulos)[])
+    .filter((rota) => rota !== ROTAS.INICIO)
+    .find((rota) => pathname.toLowerCase().startsWith(rota.toLowerCase()))
+    ?? (pathname === ROTAS.INICIO ? ROTAS.INICIO : undefined);
+  const pagina = chave ? DadosTitulos[chave] : undefined;
   if (!pagina) return null;
   function sair() {logout(); navigate(ROTAS.LOGIN)}
 
@@ -59,12 +70,14 @@ export const Titulo = () => {
       <VStack as="nav"align="stretch"spacing={1}flex={1}>
         <Button as={RouterLink}to={ROTAS.INICIO}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
           <Icon as={Home}boxSize={4}/>}>Início</Button>
+        <Button as={RouterLink}to={ROTAS.APARTAMENTOS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
+          <Icon as={DoorOpen}boxSize={4}/>}>Apartamentos</Button>
+        <Button as={RouterLink}to={ROTAS.VAGAS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
+          <Icon as={CarFront}boxSize={4}/>}>Vagas</Button>
+        <Button as={RouterLink}to={ROTAS.VEICULOS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
+          <Icon as={Car}boxSize={4}/>}>Veículos</Button>
         <Button as={RouterLink}to={ROTAS.PESSOA}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
           <Icon as={Users}boxSize={4}/>}>Pessoas</Button>
-        <Button as={RouterLink}to={ROTAS.PROJETOS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-          <Icon as={FolderKanban}boxSize={4}/>}>Projetos</Button>
-        <Button as={RouterLink}to={ROTAS.TAREFAS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-          <Icon as={ClipboardList}boxSize={4}/>}>Tarefas</Button>
         {user?.admin_sistema && (
           <Button as={RouterLink}to={ROTAS.CONDOMINIOS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
             <Icon as={Building}boxSize={4}/>}>Condomínios</Button>

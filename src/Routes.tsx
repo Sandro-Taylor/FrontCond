@@ -8,6 +8,10 @@ import { Pessoas } from "./Pages/Pessoas/Pessoas";
 import { CriarProjeto as Projetos } from "./Pages/Projetos/Projetos";
 import { Tarefas } from "./Pages/Tarefas/CriarTarefa";
 import { Condominios } from "./Pages/Condominios/Condominios";
+import { Apartamentos } from "./Pages/Apartamentos/Apartamentos";
+import { ApartamentoPagina } from "./Pages/Apartamentos/ApartamentoPagina";
+import { Vagas } from "./Pages/Vagas/Vagas";
+import { Veiculos } from "./Pages/Veiculos/Veiculos";
 
 import { ROTAS } from "./Pages/Titulos/Titulos";
 
@@ -74,6 +78,26 @@ export const RoutesApp = () => {
         <Route
           path={ROTAS.INICIO}
           element={<Protected Item={Dashboard} />}
+        />
+
+        <Route
+          path={ROTAS.APARTAMENTOS}
+          element={<Protected Item={Apartamentos} exigeCondominio />}
+        />
+
+        <Route
+          path={`${ROTAS.APARTAMENTOS}/:id`}
+          element={<Protected Item={ApartamentoPagina} exigeCondominio />}
+        />
+
+        <Route
+          path={ROTAS.VAGAS}
+          element={<Protected Item={Vagas} exigeCondominio />}
+        />
+
+        <Route
+          path={ROTAS.VEICULOS}
+          element={<Protected Item={Veiculos} exigeCondominio />}
         />
 
         <Route

@@ -83,3 +83,15 @@ export async function mensagemErro(response: Response, padrao: string): Promise<
   }
   return padrao;
 }
+
+export function formatarCnpj(valor: string | null | undefined) {
+  if (!valor) return "";
+  const cnpj = valor.replace(/[^0-9A-Za-z]/g, "").toUpperCase().slice(0, 14);
+  return cnpj.length === 14 ? cnpj.replace(/^(\w{2})(\w{3})(\w{3})(\w{4})(\w{2})$/, "$1.$2.$3/$4-$5") : cnpj;
+}
+
+export function formatarCep(valor: string | null | undefined) {
+  if (!valor) return "";
+  const cep = valor.replace(/\D/g, "").slice(0, 8);
+  return cep.length > 5 ? `${cep.slice(0, 5)}-${cep.slice(5)}` : cep;
+}

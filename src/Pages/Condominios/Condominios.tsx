@@ -15,7 +15,7 @@ import {
 import { AddIcon, EditIcon } from "@chakra-ui/icons";
 
 import { API_BASE_URL_USERS } from "../../config";
-import { cabecalhos, formatarData, formatarTelefone, mensagemErro } from "../../Components/config";
+import { cabecalhos, formatarCep, formatarCnpj, formatarData, formatarTelefone, mensagemErro } from "../../Components/config";
 import { useAuth } from "../Login/useAuth";
 import { Titulo } from "../Titulos/Titulos";
 
@@ -47,20 +47,6 @@ const FORMULARIO_VAZIO: Formulario = {
 };
 
 const UFS = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"];
-
-// MÁSCARAS
-
-function formatarCnpj(valor: string | null) {
-  if (!valor) return "";
-  const cnpj = valor.replace(/[^0-9A-Za-z]/g, "").toUpperCase().slice(0, 14);
-  return cnpj.length === 14 ? cnpj.replace(/^(\w{2})(\w{3})(\w{3})(\w{4})(\w{2})$/, "$1.$2.$3/$4-$5") : cnpj;
-}
-
-function formatarCep(valor: string | null) {
-  if (!valor) return "";
-  const cep = valor.replace(/\D/g, "").slice(0, 8);
-  return cep.length > 5 ? `${cep.slice(0, 5)}-${cep.slice(5)}` : cep;
-}
 
 // API
 
@@ -260,7 +246,7 @@ export const Condominios = () => {
                 {campoTexto("telefone", "Telefone", { placeholder: "(00) 0000-0000" })}
                 <Box gridColumn={{ md: "span 2" }}>{campoTexto("email", "E-mail", { type: "email" })}</Box>
                 {campoTexto("cep", "CEP", { placeholder: "00000-000" })}
-                {campoTexto("logradouro", "Logradouro")}
+                {campoTexto("logradouro", "Endereço (rua, avenida)", { placeholder: "Ex.: Rua das Flores" })}
                 {campoTexto("numero", "Número")}
                 {campoTexto("complemento", "Complemento")}
                 {campoTexto("bairro", "Bairro")}
