@@ -1,0 +1,11 @@
+# dependências e build
+node_modules/
+dist/
+
+# variáveis de ambiente (URL da API etc.)
+.env
+.env.*
+
+# sistema
+.DS_Store
+*.log
