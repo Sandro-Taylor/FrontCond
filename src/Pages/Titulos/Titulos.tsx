@@ -1,8 +1,9 @@
 import { useAuth } from "../Login/useAuth";
 import { ROTULOS_PERFIL, type PerfilPessoa } from "../Pessoas/ConfigPessoas";
+import { usePermissoes } from "../../Components/permissoes";
 import {Badge,Box,Button,Flex,Heading,Icon,Select,Text,VStack} from "@chakra-ui/react";
 import {Link as RouterLink,useLocation,useNavigate} from "react-router-dom";
-import {Building,Car,CarFront,DoorOpen,Home,LogOut,Users} from "lucide-react";
+import {Car,LayoutDashboard,UserCog,CarFront,DoorOpen,Home,KeyRound,ListChecks,LogOut,Megaphone,MessageSquare,Users,Wallet} from "lucide-react";
 
 export const ROTAS = {
   INICIO: "/",
@@ -12,6 +13,12 @@ export const ROTAS = {
   VEICULOS: "/Veiculos",
   PESSOA: "/Pessoas",
   CONDOMINIOS: "/Condominios",
+  USUARIOS: "/Usuarios",
+  FINANCEIRO: "/Financeiro",
+  AVISOS: "/Avisos",
+  ATENDIMENTO: "/Atendimento",
+  TAREFAS: "/Tarefas",
+  TROCAR_SENHA: "/TrocarSenha",
 } as const;
 
 const DadosTitulos = {
@@ -20,13 +27,20 @@ const DadosTitulos = {
   [ROTAS.VAGAS]: {titulo: "Vagas",descricao: "Vagas fixas e rotativas.",},
   [ROTAS.VEICULOS]: {titulo: "Veículos",descricao: "Veículos, vagas e condutores.",},
   [ROTAS.PESSOA]: {titulo: "Pessoas",descricao: "Moradores, prestadores e equipe.",},
-  [ROTAS.CONDOMINIOS]: {titulo: "Condomínios",descricao: "Cadastro dos condomínios do sistema.",},
+  [ROTAS.CONDOMINIOS]: {titulo: "Painel do sistema",descricao: "Todos os condomínios e seus síndicos.",},
+  [ROTAS.USUARIOS]: {titulo: "Usuários",descricao: "Logins de todo o sistema.",},
+  [ROTAS.FINANCEIRO]: {titulo: "Financeiro",descricao: "Cotas condominiais.",},
+  [ROTAS.AVISOS]: {titulo: "Avisos",descricao: "Quadro de avisos do condomínio.",},
+  [ROTAS.ATENDIMENTO]: {titulo: "Atendimento",descricao: "Conversas com a administração.",},
+  [ROTAS.TAREFAS]: {titulo: "Tarefas",descricao: "Tarefas da administração e responsáveis.",},
+  [ROTAS.TROCAR_SENHA]: {titulo: "Minha conta",descricao: "Troca de senha.",},
 };
 
 export const Titulo = () => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { user, logout, condominioAtual, trocarCondominio } = useAuth();
+  const permissoes = usePermissoes();
   // página exata ou subpágina (ex.: /Apartamentos/123 usa o título de /Apartamentos)
   const chave = (Object.keys(DadosTitulos) as (keyof typeof DadosTitulos)[])
     .filter((rota) => rota !== ROTAS.INICIO)
@@ -65,22 +79,58 @@ export const Titulo = () => {
       )}
 
       <VStack as="nav"align="stretch"spacing={1}flex={1}>
+        {user?.admin_sistema && (
+          <>
+            <Text fontSize="2xs" fontWeight="bold" color="gray.400" textTransform="uppercase" letterSpacing="wider" paddingX={3}>Administração do sistema</Text>
+            <Button as={RouterLink}to={ROTAS.CONDOMINIOS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
+              <Icon as={LayoutDashboard}boxSize={4}/>}>Painel e condomínios</Button>
+            <Button as={RouterLink}to={ROTAS.USUARIOS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
+              <Icon as={UserCog}boxSize={4}/>}>Usuários</Button>
+            {condominioAtual && (
+              <Text fontSize="2xs" fontWeight="bold" color="gray.400" textTransform="uppercase" letterSpacing="wider" paddingX={3} paddingTop={3}>
+                {condominioAtual.nome}
+              </Text>
+            )}
+          </>
+        )}
         <Button as={RouterLink}to={ROTAS.INICIO}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
           <Icon as={Home}boxSize={4}/>}>Início</Button>
-        <Button as={RouterLink}to={ROTAS.APARTAMENTOS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-          <Icon as={DoorOpen}boxSize={4}/>}>Apartamentos</Button>
-        <Button as={RouterLink}to={ROTAS.VAGAS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-          <Icon as={CarFront}boxSize={4}/>}>Vagas</Button>
-        <Button as={RouterLink}to={ROTAS.VEICULOS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-          <Icon as={Car}boxSize={4}/>}>Veículos</Button>
-        <Button as={RouterLink}to={ROTAS.PESSOA}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-          <Icon as={Users}boxSize={4}/>}>Pessoas</Button>
-        {user?.admin_sistema && (
-          <Button as={RouterLink}to={ROTAS.CONDOMINIOS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-            <Icon as={Building}boxSize={4}/>}>Condomínios</Button>
+        {condominioAtual && (
+          <Button as={RouterLink}to={ROTAS.AVISOS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
+            <Icon as={Megaphone}boxSize={4}/>}>Avisos</Button>
+        )}
+        {condominioAtual && (
+          <Button as={RouterLink}to={ROTAS.ATENDIMENTO}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
+            <Icon as={MessageSquare}boxSize={4}/>}>{permissoes.editaTudo ? "Atendimento" : "Fale com o síndico"}</Button>
+        )}
+        {permissoes.acessaCadastros && (
+          <Button as={RouterLink}to={ROTAS.APARTAMENTOS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
+            <Icon as={DoorOpen}boxSize={4}/>}>Apartamentos</Button>
+        )}
+        {permissoes.veTudo && (
+          <Button as={RouterLink}to={ROTAS.VAGAS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
+            <Icon as={CarFront}boxSize={4}/>}>Vagas</Button>
+        )}
+        {permissoes.acessaCadastros && (
+          <Button as={RouterLink}to={ROTAS.VEICULOS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
+            <Icon as={Car}boxSize={4}/>}>Veículos</Button>
+        )}
+        {permissoes.acessaCadastros && (
+          <Button as={RouterLink}to={ROTAS.PESSOA}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
+            <Icon as={Users}boxSize={4}/>}>Pessoas</Button>
+        )}
+        {permissoes.acessaTarefas && (
+          <Button as={RouterLink}to={ROTAS.TAREFAS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
+            <Icon as={ListChecks}boxSize={4}/>}>Tarefas</Button>
+        )}
+        {permissoes.acessaFinanceiro && (
+          <Button as={RouterLink}to={ROTAS.FINANCEIRO}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
+            <Icon as={Wallet}boxSize={4}/>}>Financeiro</Button>
         )}
       </VStack>
 
+      <Button as={RouterLink}to={ROTAS.TROCAR_SENHA}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
+      <Icon as={KeyRound}boxSize={4}/>}>Trocar senha</Button>
       <Button variant="outline"size="sm"colorScheme="red"onClick={sair}justifyContent="flex-start"leftIcon={
       <Icon as={LogOut}boxSize={4}/>}>Sair</Button>
     </Flex>

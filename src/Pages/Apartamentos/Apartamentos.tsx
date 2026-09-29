@@ -17,6 +17,7 @@ import {
 import { AddIcon, SearchIcon } from "@chakra-ui/icons";
 
 import { Titulo } from "../Titulos/Titulos";
+import { usePermissoes } from "../../Components/permissoes";
 import { rotuloApartamento } from "../Pessoas/ConfigPessoas";
 import { IconeCarro, IconeCasa, IconeChave, IconePredio, IconeUsuario, IconeVaga } from "../Pessoas/IconesPessoas";
 import { apiApartamentos } from "./API";
@@ -43,6 +44,7 @@ const Contador = ({ icone: Icone, valor, rotulo }: { icone: ElementType; valor: 
 
 export const Apartamentos = () => {
   const toast = useToast();
+  const permissoes = usePermissoes();
   const modalNovo = useDisclosure();
   const navigate = useNavigate();
 
@@ -115,7 +117,7 @@ export const Apartamentos = () => {
             <Text fontSize="2xl" fontWeight="semibold" color="gray.800">Apartamentos</Text>
             <Text fontSize="sm" color="gray.500" marginTop={1}>{apartamentos.length} unidade(s) cadastrada(s)</Text>
           </Box>
-          <Button colorScheme="blue" borderRadius="lg" leftIcon={<AddIcon boxSize={2.5} />} onClick={modalNovo.onOpen}>Novo apartamento</Button>
+          {permissoes.editaTudo && <Button colorScheme="blue" borderRadius="lg" leftIcon={<AddIcon boxSize={2.5} />} onClick={modalNovo.onOpen}>Novo apartamento</Button>}
         </Flex>
 
         {!carregando && apartamentos.length > 0 && (
@@ -146,7 +148,7 @@ export const Apartamentos = () => {
           <Flex direction="column" align="center" padding={16}>
             <IconePredio boxSize={6} color="gray.400" />
             <Text marginTop={3} color="gray.700" fontWeight="medium">Nenhum apartamento cadastrado</Text>
-            <Button marginTop={5} size="sm" colorScheme="blue" leftIcon={<AddIcon />} onClick={modalNovo.onOpen}>Novo apartamento</Button>
+            {permissoes.editaTudo && <Button marginTop={5} size="sm" colorScheme="blue" leftIcon={<AddIcon />} onClick={modalNovo.onOpen}>Novo apartamento</Button>}
           </Flex>
         ) : filtrados.length === 0 ? (
           <Flex direction="column" align="center" padding={16}>

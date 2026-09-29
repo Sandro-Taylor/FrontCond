@@ -2,6 +2,8 @@
 // PESSOAS
 // ---------------------------------------------------------
 // Consulta e edição dos dados das pessoas do condomínio.
+// Funcionário (porteiro, zelador...) tem a ficha com cargo,
+// vínculo, turno e admissão; a lista de cargos é gerida aqui.
 // Os vínculos com apartamentos (proprietário, inquilino,
 // residente), vagas e veículos são geridos em Apartamentos.
 // ---------------------------------------------------------
@@ -9,18 +11,23 @@
 import { useEffect, useState } from "react";
 import type { ElementType, KeyboardEvent, ReactNode } from "react";
 import {
-  Avatar, Badge, Box, Button, Divider, Flex, Input, InputGroup, InputLeftElement, Modal, ModalBody, ModalCloseButton,
-  ModalContent, ModalHeader, ModalOverlay, Select, SimpleGrid, Spinner, Table, TableContainer, Tbody, Td, Text, Th,
-  Thead, Tr, VStack, createIcon, useDisclosure,
+  Alert, AlertIcon, Avatar, Badge, Box, Button, Divider, Flex, FormControl, FormLabel, Input, InputGroup, InputLeftElement,
+  Modal, ModalBody, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalOverlay, Select, SimpleGrid, Spinner,
+  Table, TableContainer, Tbody, Td, Text, Th, Thead, Tr, VStack, createIcon, useDisclosure, useToast,
 } from "@chakra-ui/react";
-import { AddIcon, CalendarIcon, CheckCircleIcon, ChevronRightIcon, DeleteIcon, EmailIcon, InfoOutlineIcon, PhoneIcon, SearchIcon, TimeIcon } from "@chakra-ui/icons";
+import { AddIcon, CalendarIcon, CheckCircleIcon, ChevronRightIcon, CopyIcon, DeleteIcon, EmailIcon, InfoOutlineIcon, LockIcon, PhoneIcon, RepeatIcon, SearchIcon, TimeIcon, UnlockIcon } from "@chakra-ui/icons";
 import { Titulo } from "../Titulos/Titulos";
 import { CelulaEditavel } from "../../Components/CelulaEditavel";
 import { formatarCpf, formatarData, formatarDataIso, formatarPlaca, formatarTelefone } from "../../Components/config";
 import { CriarPessoa } from "./PessoasCriar";
 import { usePessoas } from "./Hooks/Pessoas";
+import { darAcesso, gerarNovaSenha, removerAcesso, type AcessoResultado } from "./API/AcessoPessoa";
+import { usePermissoes } from "../../Components/permissoes";
+import { useAuth } from "../Login/useAuth";
+import { CamposFuncionario, ModalCargos, fichaParaValores, paraFichaDados, useCargos, validarFicha, type ValoresFicha } from "./CamposFuncionario";
+import { salvarFichaFuncionario } from "./API/FuncionarioPessoa";
 import {
-  ROTULOS_CATEGORIA, ROTULOS_PERFIL, categoriaPessoa, descreverVinculo, rotuloApartamento,
+  PERFIS_SO_ADM, ROTULOS_CATEGORIA, ROTULOS_PERFIL, categoriaPessoa, descreverVinculo, rotuloApartamento, rotuloPerfilCompleto,
   type Categoria, type PerfilPessoa, type Pessoa, type PessoaEditarDados, type TipoRelacao,
 } from "./ConfigPessoas";
 import { IconeCarro, IconeCartao, IconeCasa, IconeChave, IconePredio, IconeUsuario } from "./IconesPessoas";
@@ -145,7 +152,26 @@ export const Pessoas = () => {
   const [visualizacao, setVisualizacao] = useState<Visualizacao>(() => {
     try { return localStorage.getItem(CHAVE_VISUALIZACAO) === "lista" ? "lista" : "cards"; } catch { return "cards"; }
   });
-  const { pessoas, carregando, criando, criar, editar, excluir } = usePessoas();
+  const { pessoas, carregando, criando, criar, editar, excluir, carregarPessoas } = usePessoas();
+  const permissoes = usePermissoes();
+  const toast = useToast();
+  const { user } = useAuth();
+  const ehAdm = Boolean(user?.admin_sistema);
+  // síndico e conselheiros: perfil, situação, acesso e exclusão só pelo ADM do sistema
+  const protegida = (pessoa: Pessoa) => !ehAdm && PERFIS_SO_ADM.includes(pessoa.perfil);
+
+  // funcionários: cargos e ficha
+  const { cargos, recarregar: recarregarCargos } = useCargos(permissoes.veTudo);
+  const modalCargos = useDisclosure();
+  const [filtroCargo, setFiltroCargo] = useState("");
+  const [ficha, setFicha] = useState<ValoresFicha>(fichaParaValores(null));
+  const [salvandoFicha, setSalvandoFicha] = useState(false);
+
+  // acesso ao sistema
+  const modalAcesso = useDisclosure();
+  const [emailAcesso, setEmailAcesso] = useState("");
+  const [resultadoAcesso, setResultadoAcesso] = useState<AcessoResultado | null>(null);
+  const [processandoAcesso, setProcessandoAcesso] = useState(false);
 
   // mantém o modal com os dados mais recentes depois de salvar
   useEffect(() => {
@@ -154,23 +180,44 @@ export const Pessoas = () => {
     if (atualizada) setPessoaSelecionada(atualizada);
   }, [pessoas]);
 
+  // formulário da ficha acompanha a pessoa aberta
+  useEffect(() => { setFicha(fichaParaValores(pessoaSelecionada?.funcionario ?? null)); }, [pessoaSelecionada]);
+
+  async function salvarFicha() {
+    if (!pessoaSelecionada) return;
+    const erro = validarFicha(ficha);
+    if (erro) { toast({ title: erro, status: "warning" }); return; }
+    try {
+      setSalvandoFicha(true);
+      await salvarFichaFuncionario(pessoaSelecionada.id, paraFichaDados(ficha));
+      await carregarPessoas();
+      toast({ title: "Ficha do funcionário salva", status: "success", duration: 2000 });
+    } catch (e) {
+      toast({ title: e instanceof Error ? e.message : "Erro ao salvar a ficha", status: "error" });
+    } finally {
+      setSalvandoFicha(false);
+    }
+  }
+
   // FILTROS
   function mudarVisualizacao(nova: Visualizacao) {
     setVisualizacao(nova);
     try { localStorage.setItem(CHAVE_VISUALIZACAO, nova); } catch { /* sem localStorage */ }
   }
-  function limparFiltros() { setBusca(""); setFiltroStatus("todas"); setFiltroCategoria("TODAS"); }
+  function limparFiltros() { setBusca(""); setFiltroStatus("todas"); setFiltroCategoria("TODAS"); setFiltroCargo(""); }
 
   const termo = busca.trim().toLowerCase();
   const termoNumeros = termo.replace(/\D/g, "");
-  const filtrando = termo !== "" || filtroStatus !== "todas" || filtroCategoria !== "TODAS";
+  const filtrando = termo !== "" || filtroStatus !== "todas" || filtroCategoria !== "TODAS" || filtroCargo !== "";
   const pessoasFiltradas = pessoas.filter((p) => {
     if (filtroStatus === "ativas" && !p.ativo) return false;
     if (filtroStatus === "inativas" && p.ativo) return false;
     if (filtroCategoria !== "TODAS" && categoriaPessoa(p) !== filtroCategoria) return false;
+    if (filtroCargo && p.funcionario?.cargo_id !== filtroCargo) return false;
     if (!termo) return true;
     return (
       p.nome.toLowerCase().includes(termo) ||
+      (p.funcionario?.cargo_nome ?? "").toLowerCase().includes(termo) ||
       (termoNumeros !== "" && (p.cpf ?? "").includes(termoNumeros)) ||
       (p.email ?? "").toLowerCase().includes(termo) ||
       p.apartamentos.some((v) => rotuloApartamento(v.apartamento).toLowerCase().includes(termo))
@@ -187,6 +234,62 @@ export const Pessoas = () => {
       data_nascimento: pessoa.data_nascimento, ativo: pessoa.ativo, perfil: pessoa.perfil, [campo]: valor,
     };
     await editar(pessoa.id, dados);
+  }
+
+  // ================= ACESSO AO SISTEMA =================
+  function abrirDarAcesso() {
+    setEmailAcesso(pessoaSelecionada?.email ?? "");
+    setResultadoAcesso(null);
+    modalAcesso.onOpen();
+  }
+
+  async function confirmarDarAcesso() {
+    if (!pessoaSelecionada) return;
+    if (!emailAcesso.trim()) {
+      toast({ title: "Informe o e-mail: ele será o login da pessoa", status: "warning" });
+      return;
+    }
+    try {
+      setProcessandoAcesso(true);
+      setResultadoAcesso(await darAcesso(pessoaSelecionada.id, emailAcesso.trim()));
+      await carregarPessoas();
+    } catch (erro) {
+      toast({ title: erro instanceof Error ? erro.message : "Erro ao dar acesso", status: "error" });
+    } finally {
+      setProcessandoAcesso(false);
+    }
+  }
+
+  async function redefinirSenha() {
+    if (!pessoaSelecionada) return;
+    if (!window.confirm(`Gerar uma nova senha para ${pessoaSelecionada.nome}? A senha atual deixa de funcionar.`)) return;
+    try {
+      setResultadoAcesso(await gerarNovaSenha(pessoaSelecionada.id));
+      modalAcesso.onOpen();
+    } catch (erro) {
+      toast({ title: erro instanceof Error ? erro.message : "Erro ao gerar nova senha", status: "error" });
+    }
+  }
+
+  async function tirarAcesso() {
+    if (!pessoaSelecionada) return;
+    if (!window.confirm(`Remover o acesso de ${pessoaSelecionada.nome} ao sistema neste condomínio? O cadastro da pessoa continua.`)) return;
+    try {
+      await removerAcesso(pessoaSelecionada.id);
+      await carregarPessoas();
+      toast({ title: "Acesso removido", status: "success", duration: 2000 });
+    } catch (erro) {
+      toast({ title: erro instanceof Error ? erro.message : "Erro ao remover acesso", status: "error" });
+    }
+  }
+
+  async function copiarSenha(senha: string) {
+    try {
+      await navigator.clipboard.writeText(senha);
+      toast({ title: "Senha copiada", status: "success", duration: 1500 });
+    } catch {
+      toast({ title: "Não foi possível copiar; anote a senha", status: "warning" });
+    }
   }
 
   async function handleExcluir() {
@@ -207,7 +310,12 @@ export const Pessoas = () => {
                 : `${pessoas.length} ${pessoas.length === 1 ? "pessoa cadastrada" : "pessoas cadastradas"}`}
             </Text>
           </Box>
-          <Button colorScheme="blue" borderRadius="lg" leftIcon={<AddIcon boxSize={2.5} />} onClick={modalAdicionar.onOpen}>Nova pessoa</Button>
+          {permissoes.editaTudo && (
+            <Flex gap={2}>
+              <Button variant="outline" borderRadius="lg" onClick={modalCargos.onOpen}>Cargos</Button>
+              <Button colorScheme="blue" borderRadius="lg" leftIcon={<AddIcon boxSize={2.5} />} onClick={modalAdicionar.onOpen}>Nova pessoa</Button>
+            </Flex>
+          )}
         </Flex>
 
         {/* INDICADORES */}
@@ -217,7 +325,7 @@ export const Pessoas = () => {
             <Indicador icone={IconeChave} rotulo="Proprietários" valor={contar("PROPRIETARIO")} />
             <Indicador icone={IconeCasa} rotulo="Inquilinos" valor={contar("INQUILINO")} />
             <Indicador icone={IconeUsuario} rotulo="Residentes" valor={contar("RESIDENTE")} />
-            <Indicador icone={CheckCircleIcon} rotulo="Equipe e prestadores" valor={contar("COLABORADOR", "PRESTADOR", "GESTAO")} />
+            <Indicador icone={CheckCircleIcon} rotulo="Funcionários" valor={contar("FUNCIONARIO")} />
           </SimpleGrid>
         )}
 
@@ -227,12 +335,18 @@ export const Pessoas = () => {
             <Flex align={{ base: "stretch", md: "center" }} direction={{ base: "column", md: "row" }} gap={3} flex={1}>
               <InputGroup maxWidth={{ base: "100%", md: "380px" }}>
                 <InputLeftElement pointerEvents="none"><SearchIcon color="gray.400" boxSize={3.5} /></InputLeftElement>
-                <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, CPF, e-mail ou apartamento" bg="white" borderRadius="lg" />
+                <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, CPF, e-mail, apartamento ou cargo" bg="white" borderRadius="lg" />
               </InputGroup>
-              <Select maxWidth={{ md: "220px" }} bg="white" borderRadius="lg" value={filtroCategoria} onChange={(e) => setFiltroCategoria(e.target.value as Categoria | "TODAS")}>
+              <Select maxWidth={{ md: "220px" }} bg="white" borderRadius="lg" value={filtroCategoria} onChange={(e) => { setFiltroCategoria(e.target.value as Categoria | "TODAS"); setFiltroCargo(""); }}>
                 <option value="TODAS">Todas as categorias</option>
                 {(Object.keys(ROTULOS_CATEGORIA) as Categoria[]).map((c) => <option key={c} value={c}>{ROTULOS_CATEGORIA[c].rotulo}</option>)}
               </Select>
+              {filtroCategoria === "FUNCIONARIO" && cargos.length > 0 && (
+                <Select maxWidth={{ md: "200px" }} bg="white" borderRadius="lg" value={filtroCargo} onChange={(e) => setFiltroCargo(e.target.value)}>
+                  <option value="">Todos os cargos</option>
+                  {cargos.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                </Select>
+              )}
               <Segmentado<FiltroStatus> valor={filtroStatus} aoMudar={setFiltroStatus} opcoes={[{ valor: "todas", rotulo: "Todas" }, { valor: "ativas", rotulo: "Ativas" }, { valor: "inativas", rotulo: "Inativas" }]} />
             </Flex>
             <Segmentado<Visualizacao> valor={visualizacao} aoMudar={mudarVisualizacao} opcoes={[{ valor: "cards", rotulo: "Cards", icone: IconeGrade }, { valor: "lista", rotulo: "Lista", icone: IconeLista }]} />
@@ -246,7 +360,7 @@ export const Pessoas = () => {
           <Flex direction="column" align="center" padding={16}>
             <InfoOutlineIcon boxSize={6} color="gray.400" />
             <Text marginTop={3} color="gray.700" fontWeight="medium">Nenhuma pessoa cadastrada</Text>
-            <Text marginTop={1} fontSize="sm" color="gray.500">Moradores entram pelo cadastro do apartamento. Aqui você cadastra também síndico, colaboradores e prestadores.</Text>
+            <Text marginTop={1} fontSize="sm" color="gray.500">Moradores entram pelo cadastro do apartamento. Aqui você cadastra também síndico, conselho, funcionários e prestadores.</Text>
           </Flex>
         ) : pessoasFiltradas.length === 0 ? (
           <Flex direction="column" align="center" padding={16}>
@@ -278,7 +392,7 @@ export const Pessoas = () => {
 
                   <SimpleGrid columns={2} spacing={4} padding={5} flex={1}>
                     <Dado icone={IconePredio} rotulo="Unidade">{principal ? rotuloApartamento(principal.apartamento) : "Sem unidade"}</Dado>
-                    <Dado icone={IconeUsuario} rotulo="Perfil">{ROTULOS_PERFIL[pessoa.perfil]}</Dado>
+                    <Dado icone={IconeUsuario} rotulo="Perfil">{rotuloPerfilCompleto(pessoa)}</Dado>
                     <Box gridColumn="span 2">
                       <Dado icone={IconeChave} rotulo="Vínculo">{principal ? descreverVinculo(principal) : "-"}</Dado>
                     </Box>
@@ -289,6 +403,7 @@ export const Pessoas = () => {
                   <Flex justify="space-between" align="center" paddingX={5} paddingY={3}>
                     <Flex align="center" gap={2}>
                       <BadgeCategoria pessoa={pessoa} />
+                      {pessoa.user_id && <Badge borderRadius="full" paddingX={2} fontSize="xs" textTransform="none" colorScheme="green" variant="outline">Acesso</Badge>}
                       {outros > 0 && <Text fontSize="xs" color="gray.500">+{outros} unidade(s)</Text>}
                     </Flex>
                     <ChevronRightIcon color="blue.500" />
@@ -323,7 +438,7 @@ export const Pessoas = () => {
                         <Td><BadgeCategoria pessoa={pessoa} /></Td>
                         <Td>{principal ? rotuloApartamento(principal.apartamento) : "-"}</Td>
                         <Td>{principal ? descreverVinculo(principal) : "-"}</Td>
-                        <Td>{ROTULOS_PERFIL[pessoa.perfil]}</Td>
+                        <Td>{rotuloPerfilCompleto(pessoa)}</Td>
                         <Td><BadgeStatus ativo={pessoa.ativo} /></Td>
                       </Tr>
                     );
@@ -341,7 +456,7 @@ export const Pessoas = () => {
             <ModalHeader>Nova pessoa</ModalHeader>
             <ModalCloseButton />
             <ModalBody paddingBottom={6}>
-              <CriarPessoa aoCriar={modalAdicionar.onClose} criando={criando} criar={criar} />
+              <CriarPessoa aoCriar={modalAdicionar.onClose} criando={criando} criar={criar} cargos={cargos} />
             </ModalBody>
           </ModalContent>
         </Modal>
@@ -371,37 +486,57 @@ export const Pessoas = () => {
                   <TituloSecao icone={IconeUsuario}>Informações pessoais</TituloSecao>
                   <SimpleGrid columns={{ base: 1, md: 2 }} spacing={5}>
                     <Campo icone={IconeUsuario} rotulo="Nome">
-                      <CelulaEditavel valor={pessoaSelecionada.nome} onSalvar={(valor) => editarCampo(pessoaSelecionada, "nome", valor)} />
+                      <CelulaEditavel editavel={permissoes.editaUnidade} valor={pessoaSelecionada.nome} onSalvar={(valor) => editarCampo(pessoaSelecionada, "nome", valor)} />
                     </Campo>
                     <Campo icone={IconeCartao} rotulo="CPF">
-                      <CelulaEditavel valor={pessoaSelecionada.cpf || ""} formatar={formatarCpf} placeholder="Adicionar CPF" onSalvar={(valor) => editarCampo(pessoaSelecionada, "cpf", valor || null)} />
+                      <CelulaEditavel editavel={permissoes.editaUnidade} valor={pessoaSelecionada.cpf || ""} formatar={formatarCpf} placeholder="Adicionar CPF" onSalvar={(valor) => editarCampo(pessoaSelecionada, "cpf", valor || null)} />
                     </Campo>
                     <Campo icone={EmailIcon} rotulo="E-mail">
-                      <CelulaEditavel valor={pessoaSelecionada.email || ""} placeholder="Adicionar e-mail" onSalvar={(valor) => editarCampo(pessoaSelecionada, "email", valor || null)} />
+                      <CelulaEditavel editavel={permissoes.editaUnidade} valor={pessoaSelecionada.email || ""} placeholder="Adicionar e-mail" onSalvar={(valor) => editarCampo(pessoaSelecionada, "email", valor || null)} />
                     </Campo>
                     <Campo icone={PhoneIcon} rotulo="Telefone">
-                      <CelulaEditavel valor={pessoaSelecionada.telefone || ""} formatar={formatarTelefone} placeholder="Adicionar telefone" onSalvar={(valor) => editarCampo(pessoaSelecionada, "telefone", valor || null)} />
+                      <CelulaEditavel editavel={permissoes.editaUnidade} valor={pessoaSelecionada.telefone || ""} formatar={formatarTelefone} placeholder="Adicionar telefone" onSalvar={(valor) => editarCampo(pessoaSelecionada, "telefone", valor || null)} />
                     </Campo>
                     <Campo icone={CalendarIcon} rotulo="Nascimento">
-                      <CelulaEditavel valor={pessoaSelecionada.data_nascimento || ""} tipo="date" formatar={formatarDataIso} placeholder="Adicionar data" onSalvar={(valor) => editarCampo(pessoaSelecionada, "data_nascimento", valor || null)} />
+                      <CelulaEditavel editavel={permissoes.editaUnidade} valor={pessoaSelecionada.data_nascimento || ""} tipo="date" formatar={formatarDataIso} placeholder="Adicionar data" onSalvar={(valor) => editarCampo(pessoaSelecionada, "data_nascimento", valor || null)} />
                     </Campo>
                     <Campo icone={TimeIcon} rotulo="Cadastrado em">
                       <Text fontSize="sm">{formatarData(pessoaSelecionada.created_at)}</Text>
                     </Campo>
                     <Campo icone={IconeChave} rotulo="Perfil de acesso">
-                      <Select size="sm" value={pessoaSelecionada.perfil} onChange={(e) => editarCampo(pessoaSelecionada, "perfil", e.target.value as PerfilPessoa)}>
+                      <Select size="sm" isDisabled={!permissoes.editaTudo || protegida(pessoaSelecionada)} value={pessoaSelecionada.perfil} onChange={(e) => editarCampo(pessoaSelecionada, "perfil", e.target.value as PerfilPessoa)}>
                         {(Object.keys(ROTULOS_PERFIL) as PerfilPessoa[]).map((perfil) => (
-                          <option key={perfil} value={perfil}>{ROTULOS_PERFIL[perfil]}</option>
+                          <option key={perfil} value={perfil} disabled={!ehAdm && PERFIS_SO_ADM.includes(perfil) && perfil !== pessoaSelecionada.perfil}>{ROTULOS_PERFIL[perfil]}</option>
                         ))}
                       </Select>
+                      {!ehAdm && permissoes.editaTudo && <Text fontSize="2xs" color="gray.500" marginTop={1}>Síndico e conselheiros são designados pelo administrador do sistema.</Text>}
                     </Campo>
                     <Campo icone={CheckCircleIcon} rotulo="Situação">
-                      <Select size="sm" value={pessoaSelecionada.ativo ? "ativo" : "inativo"} onChange={(e) => editarCampo(pessoaSelecionada, "ativo", e.target.value === "ativo")}>
+                      <Select size="sm" isDisabled={!permissoes.editaTudo || protegida(pessoaSelecionada)} value={pessoaSelecionada.ativo ? "ativo" : "inativo"} onChange={(e) => editarCampo(pessoaSelecionada, "ativo", e.target.value === "ativo")}>
                         <option value="ativo">Ativo</option>
                         <option value="inativo">Inativo</option>
                       </Select>
                     </Campo>
                   </SimpleGrid>
+
+                  {/* FICHA DO FUNCIONÁRIO */}
+                  {pessoaSelecionada.perfil === "FUNCIONARIO" && (
+                    <>
+                      <Divider marginY={7} />
+                      <TituloSecao icone={IconeCartao}>Ficha do funcionário</TituloSecao>
+                      {!pessoaSelecionada.funcionario && (
+                        <Alert status="warning" borderRadius="md" fontSize="sm" marginBottom={4}>
+                          <AlertIcon />Complete a ficha: escolha o cargo para o funcionário aparecer como responsável nas tarefas com o cargo certo.
+                        </Alert>
+                      )}
+                      <CamposFuncionario valores={ficha} aoMudar={setFicha} cargos={cargos} editavel={permissoes.editaTudo} tamanho="sm" />
+                      {permissoes.editaTudo && (
+                        <Flex justify="flex-end" marginTop={3}>
+                          <Button size="sm" colorScheme="blue" onClick={salvarFicha} isLoading={salvandoFicha}>Salvar ficha</Button>
+                        </Flex>
+                      )}
+                    </>
+                  )}
 
                   <Divider marginY={7} />
 
@@ -441,14 +576,102 @@ export const Pessoas = () => {
                     {pessoaSelecionada.veiculos.length === 0 && <Text fontSize="xs" color="gray.400">Nenhum veículo.</Text>}
                   </VStack>
 
-                  <Divider marginY={6} />
+                  {/* ACESSO AO SISTEMA */}
+                  {permissoes.editaTudo && (
+                    <>
+                      <Divider marginY={7} />
+                      <TituloSecao icone={LockIcon}>Acesso ao sistema</TituloSecao>
+                      {pessoaSelecionada.user_id ? (
+                        <Flex justify="space-between" align="center" gap={3} wrap="wrap" bg="green.50" borderRadius="lg" paddingX={4} paddingY={3}>
+                          <Box>
+                            <Text fontSize="sm" fontWeight="semibold" color="green.700">Tem acesso ao sistema</Text>
+                            <Text fontSize="xs" color="gray.600">Login: {pessoaSelecionada.email}</Text>
+                          </Box>
+                          <Flex gap={2}>
+                            <Button size="xs" leftIcon={<RepeatIcon />} onClick={redefinirSenha}>Gerar nova senha</Button>
+                            {!protegida(pessoaSelecionada) && <Button size="xs" variant="ghost" colorScheme="red" onClick={tirarAcesso}>Remover acesso</Button>}
+                          </Flex>
+                        </Flex>
+                      ) : (
+                        <Flex justify="space-between" align="center" gap={3} wrap="wrap" bg="gray.50" borderRadius="lg" paddingX={4} paddingY={3}>
+                          <Text fontSize="sm" color="gray.600">Esta pessoa ainda não acessa o sistema.</Text>
+                          <Button size="sm" colorScheme="green" leftIcon={<UnlockIcon />} onClick={abrirDarAcesso}>Dar acesso ao sistema</Button>
+                        </Flex>
+                      )}
 
-                  <Flex justify="flex-end">
-                    <Button leftIcon={<DeleteIcon />} variant="ghost" colorScheme="red" size="sm" onClick={handleExcluir}>Excluir pessoa</Button>
-                  </Flex>
+                      {!protegida(pessoaSelecionada) && (
+                        <>
+                          <Divider marginY={6} />
+                          <Flex justify="flex-end">
+                            <Button leftIcon={<DeleteIcon />} variant="ghost" colorScheme="red" size="sm" onClick={handleExcluir}>Excluir pessoa</Button>
+                          </Flex>
+                        </>
+                      )}
+                    </>
+                  )}
                 </ModalBody>
               </>
             )}
+          </ModalContent>
+        </Modal>
+        {/* MODAL CARGOS */}
+        {permissoes.editaTudo && <ModalCargos aberto={modalCargos.isOpen} aoFechar={modalCargos.onClose} cargos={cargos} aoMudar={recarregarCargos} />}
+
+        {/* MODAL ACESSO AO SISTEMA */}
+        <Modal isOpen={modalAcesso.isOpen} onClose={modalAcesso.onClose} isCentered>
+          <ModalOverlay />
+          <ModalContent borderRadius="2xl">
+            <ModalHeader>{resultadoAcesso ? "Acesso liberado" : "Dar acesso ao sistema"}</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              {resultadoAcesso ? (
+                <VStack align="stretch" spacing={3}>
+                  <Box>
+                    <Text fontSize="xs" color="gray.500">Login (e-mail)</Text>
+                    <Text fontWeight="semibold">{resultadoAcesso.email}</Text>
+                  </Box>
+                  {resultadoAcesso.senha_temporaria ? (
+                    <>
+                      <Box>
+                        <Text fontSize="xs" color="gray.500">Senha temporária</Text>
+                        <Flex align="center" gap={2}>
+                          <Text fontFamily="mono" fontSize="lg" fontWeight="bold" letterSpacing="wider">{resultadoAcesso.senha_temporaria}</Text>
+                          <Button size="xs" leftIcon={<CopyIcon />} onClick={() => copiarSenha(resultadoAcesso.senha_temporaria!)}>Copiar</Button>
+                        </Flex>
+                      </Box>
+                      <Alert status="warning" borderRadius="md" fontSize="sm">
+                        <AlertIcon />Anote e repasse para a pessoa agora: a senha não será mostrada de novo.
+                      </Alert>
+                    </>
+                  ) : (
+                    <Alert status="info" borderRadius="md" fontSize="sm">
+                      <AlertIcon />Este e-mail já tinha login no sistema. A pessoa entra com a senha que já usa e passa a ver este condomínio.
+                    </Alert>
+                  )}
+                </VStack>
+              ) : (
+                <>
+                  <FormControl isRequired>
+                    <FormLabel fontSize="sm">E-mail (será o login)</FormLabel>
+                    <Input type="email" value={emailAcesso} onChange={(e) => setEmailAcesso(e.target.value)} placeholder="nome@exemplo.com" autoFocus />
+                  </FormControl>
+                  <Text fontSize="xs" color="gray.500" marginTop={3}>
+                    O sistema cria o login com uma senha temporária. Se o e-mail já tiver login (ex.: síndico de outro condomínio), só liga o login a esta pessoa.
+                    O e-mail informado também fica salvo no cadastro.
+                  </Text>
+                </>
+              )}
+            </ModalBody>
+            <ModalFooter gap={3}>
+              {resultadoAcesso ? (
+                <Button colorScheme="blue" onClick={modalAcesso.onClose}>Fechar</Button>
+              ) : (
+                <>
+                  <Button variant="ghost" onClick={modalAcesso.onClose}>Cancelar</Button>
+                  <Button colorScheme="green" onClick={confirmarDarAcesso} isLoading={processandoAcesso}>Dar acesso</Button>
+                </>
+              )}
+            </ModalFooter>
           </ModalContent>
         </Modal>
       </Box>

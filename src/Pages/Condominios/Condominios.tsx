@@ -1,162 +1,93 @@
 // ---------------------------------------------------------
-// CONDOMÍNIOS (somente ADM do sistema)
+// PAINEL DO SISTEMA – CONDOMÍNIOS (somente ADM)
 // ---------------------------------------------------------
-// Listar, criar, editar, arquivar e restaurar condomínios.
-// Depois de cada alteração recarrega o /eu, para o seletor
-// de condomínio do menu ficar atualizado.
+// Todos os condomínios com síndico e números principais.
+// Novo condomínio em 2 passos: dados -> síndico (com login).
+// Ações: entrar no condomínio, editar, trocar síndico,
+// arquivar/restaurar.
 // ---------------------------------------------------------
 
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Badge, Box, Button, Flex, FormControl, FormLabel, Input, Modal, ModalBody, ModalCloseButton, ModalContent,
-  ModalFooter, ModalHeader, ModalOverlay, Select, SimpleGrid, Spinner, Table, TableContainer, Tbody, Td, Text,
-  Th, Thead, Tr, useDisclosure, useToast,
+  Badge, Box, Button, Flex, IconButton, Input, InputGroup, InputLeftElement, Menu, MenuButton, MenuItem, MenuList,
+  SimpleGrid, Spinner, Text, Tooltip, useDisclosure, useToast,
 } from "@chakra-ui/react";
-import { AddIcon, EditIcon } from "@chakra-ui/icons";
+import { AddIcon, ChevronDownIcon, SearchIcon, WarningTwoIcon } from "@chakra-ui/icons";
 
-import { API_BASE_URL_USERS } from "../../config";
-import { cabecalhos, formatarCep, formatarCnpj, formatarData, formatarTelefone, mensagemErro } from "../../Components/config";
+import { formatarCnpj } from "../../Components/config";
 import { useAuth } from "../Login/useAuth";
 import { Titulo } from "../Titulos/Titulos";
+import { apiCondominios, type Condominio, type CondominioPainel } from "./ConfigCondominios";
+import { ModalCondominio, ModalSindico } from "./ModaisCondominio";
 
-// TIPOS
+const Indicador = ({ rotulo, valor, cor }: { rotulo: string; valor: number; cor?: string }) => (
+  <Box bg="white" paddingX={5} paddingY={4}>
+    <Text fontSize="xs" fontWeight="medium" color="gray.500">{rotulo}</Text>
+    <Text marginTop={1} fontSize="2xl" fontWeight="semibold" color={cor ?? "gray.800"}>{valor}</Text>
+  </Box>
+);
 
-export type Condominio = {
-  id: string;
-  nome: string;
-  cnpj: string | null;
-  cep: string | null;
-  logradouro: string | null;
-  numero: string | null;
-  complemento: string | null;
-  bairro: string | null;
-  cidade: string | null;
-  uf: string | null;
-  telefone: string | null;
-  email: string | null;
-  ativo: boolean;
-  created_at: string;
-  updated_at: string;
-};
-
-type Campo = "nome" | "cnpj" | "cep" | "logradouro" | "numero" | "complemento" | "bairro" | "cidade" | "uf" | "telefone" | "email";
-type Formulario = Record<Campo, string>;
-
-const FORMULARIO_VAZIO: Formulario = {
-  nome: "", cnpj: "", cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", uf: "", telefone: "", email: "",
-};
-
-const UFS = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"];
-
-// API
-
-async function requisicao<T>(caminho: string, metodo: string, mensagemPadrao: string, corpo?: unknown): Promise<T> {
-  const response = await fetch(`${API_BASE_URL_USERS}${caminho}`, {
-    method: metodo,
-    headers: cabecalhos(),
-    body: corpo === undefined ? undefined : JSON.stringify(corpo),
-  });
-  if (!response.ok) throw new Error(await mensagemErro(response, mensagemPadrao));
-  return response.json();
-}
-
-// campos vazios vão como null; o backend limpa máscaras e valida
-function paraEnvio(formulario: Formulario) {
-  const dados: Record<string, string | null> = {};
-  (Object.keys(formulario) as Campo[]).forEach((campo) => {
-    const valor = formulario[campo].trim();
-    dados[campo] = valor === "" ? null : valor;
-  });
-  return dados;
-}
-
-// PÁGINA
+const Numero = ({ rotulo, valor }: { rotulo: string; valor: number }) => (
+  <Box>
+    <Text fontSize="lg" fontWeight="semibold" color="gray.800" lineHeight="1.1">{valor}</Text>
+    <Text fontSize="2xs" color="gray.500">{rotulo}</Text>
+  </Box>
+);
 
 export const Condominios = () => {
   const toast = useToast();
-  const { user, recarregarUsuario } = useAuth();
-  const modal = useDisclosure();
+  const navigate = useNavigate();
+  const { user, recarregarUsuario, trocarCondominio } = useAuth();
+  const modalCondominio = useDisclosure();
+  const modalSindico = useDisclosure();
 
-  const [condominios, setCondominios] = useState<Condominio[]>([]);
+  const [itens, setItens] = useState<CondominioPainel[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [salvando, setSalvando] = useState(false);
+  const [busca, setBusca] = useState("");
+  const [mostrarArquivados, setMostrarArquivados] = useState(false);
   const [editando, setEditando] = useState<Condominio | null>(null);
-  const [formulario, setFormulario] = useState<Formulario>(FORMULARIO_VAZIO);
+  const [itemSindico, setItemSindico] = useState<CondominioPainel | null>(null);
 
   const carregar = useCallback(async () => {
-    try {
-      setCarregando(true);
-      setCondominios(await requisicao<Condominio[]>("/condominios/", "GET", "Não foi possível carregar os condomínios."));
-    } catch (erro) {
-      toast({ title: erro instanceof Error ? erro.message : "Erro ao carregar condomínios", status: "error" });
-    } finally {
-      setCarregando(false);
-    }
+    try { setItens(await apiCondominios.painel()); }
+    catch (e) { toast({ title: e instanceof Error ? e.message : "Erro ao carregar os condomínios", status: "error" }); }
+    finally { setCarregando(false); }
   }, [toast]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  function alterar(campo: Campo, valor: string) {
-    setFormulario((atual) => ({ ...atual, [campo]: valor }));
+  function novo() { setEditando(null); modalCondominio.onOpen(); }
+  function editar(c: Condominio) { setEditando(c); modalCondominio.onOpen(); }
+  function sindico(item: CondominioPainel) { setItemSindico(item); modalSindico.onOpen(); }
+
+  async function aoSalvo(salvo: Condominio, eraNovo: boolean) {
+    modalCondominio.onClose();
+    toast({ title: eraNovo ? "Condomínio cadastrado" : "Condomínio atualizado", status: "success", duration: 2000 });
+    await recarregarUsuario();
+    const lista = await apiCondominios.painel().catch(() => itens);
+    setItens(lista);
+    // passo 2: designar o síndico do condomínio novo
+    const item = lista.find((i) => i.condominio.id === salvo.id);
+    if (eraNovo && item) sindico(item);
   }
 
-  function abrirNovo() {
-    setEditando(null);
-    setFormulario(FORMULARIO_VAZIO);
-    modal.onOpen();
+  async function entrar(c: Condominio) {
+    await recarregarUsuario();
+    trocarCondominio(c.id);
+    navigate("/");
   }
 
-  function abrirEdicao(condominio: Condominio) {
-    setEditando(condominio);
-    setFormulario({
-      nome: condominio.nome,
-      cnpj: formatarCnpj(condominio.cnpj),
-      cep: formatarCep(condominio.cep),
-      logradouro: condominio.logradouro ?? "",
-      numero: condominio.numero ?? "",
-      complemento: condominio.complemento ?? "",
-      bairro: condominio.bairro ?? "",
-      cidade: condominio.cidade ?? "",
-      uf: condominio.uf ?? "",
-      telefone: formatarTelefone(condominio.telefone),
-      email: condominio.email ?? "",
-    });
-    modal.onOpen();
-  }
-
-  async function salvar() {
-    if (formulario.nome.trim().length < 3) {
-      toast({ title: "Informe o nome do condomínio (mínimo 3 letras)", status: "warning" });
-      return;
-    }
+  async function alternarAtivo(c: Condominio) {
+    if (c.ativo && !window.confirm(`Arquivar o condomínio "${c.nome}"? Os dados ficam guardados, mas ninguém consegue acessá-lo.`)) return;
     try {
-      setSalvando(true);
-      if (editando) {
-        await requisicao(`/condominios/${editando.id}`, "PUT", "Não foi possível salvar o condomínio.", paraEnvio(formulario));
-      } else {
-        await requisicao("/condominios/", "POST", "Não foi possível cadastrar o condomínio.", paraEnvio(formulario));
-      }
-      toast({ title: editando ? "Condomínio atualizado" : "Condomínio cadastrado", status: "success" });
-      modal.onClose();
+      if (c.ativo) await apiCondominios.arquivar(c.id);
+      else await apiCondominios.restaurar(c.id);
+      toast({ title: c.ativo ? "Condomínio arquivado" : "Condomínio restaurado", status: "success", duration: 2000 });
       await carregar();
       await recarregarUsuario();
-    } catch (erro) {
-      toast({ title: erro instanceof Error ? erro.message : "Erro ao salvar condomínio", status: "error" });
-    } finally {
-      setSalvando(false);
-    }
-  }
-
-  async function alternarAtivo(condominio: Condominio) {
-    if (condominio.ativo && !window.confirm(`Arquivar o condomínio "${condominio.nome}"? Os dados ficam guardados, mas ninguém consegue acessá-lo.`)) return;
-    try {
-      const acao = condominio.ativo ? "arquivar" : "restaurar";
-      await requisicao(`/condominios/${condominio.id}/${acao}`, "PATCH", `Não foi possível ${acao} o condomínio.`);
-      toast({ title: condominio.ativo ? "Condomínio arquivado" : "Condomínio restaurado", status: "success" });
-      await carregar();
-      await recarregarUsuario();
-    } catch (erro) {
-      toast({ title: erro instanceof Error ? erro.message : "Erro ao alterar condomínio", status: "error" });
+    } catch (e) {
+      toast({ title: e instanceof Error ? e.message : "Erro ao alterar o condomínio", status: "error" });
     }
   }
 
@@ -164,107 +95,124 @@ export const Condominios = () => {
     return (
       <Flex align="flex-start" gap={6} direction={{ base: "column", md: "row" }}>
         <Titulo />
-        <Text padding={10} color="gray.500">Apenas o administrador do sistema pode gerenciar condomínios.</Text>
+        <Text padding={10} color="gray.500">Apenas o administrador do sistema acessa o painel de condomínios.</Text>
       </Flex>
     );
   }
 
-  const campoTexto = (campo: Campo, rotulo: string, props: Record<string, unknown> = {}) => (
-    <FormControl isRequired={campo === "nome"}>
-      <FormLabel fontSize="sm">{rotulo}</FormLabel>
-      <Input size="sm" value={formulario[campo]} onChange={(e) => alterar(campo, e.target.value)} {...props} />
-    </FormControl>
-  );
+  const ativos = itens.filter((i) => i.condominio.ativo);
+  const termo = busca.trim().toLowerCase();
+  const filtrados = itens.filter((i) => {
+    if (!mostrarArquivados && !i.condominio.ativo) return false;
+    if (!termo) return true;
+    const c = i.condominio;
+    return [c.nome, c.cidade, c.bairro, c.cnpj, ...i.sindicos.map((s) => s.nome)].some((t) => (t ?? "").toLowerCase().includes(termo));
+  });
 
   return (
     <Flex align="flex-start" gap={6} direction={{ base: "column", md: "row" }}>
       <Titulo />
       <Box flex={1} minWidth={0} paddingY={6} paddingRight={{ md: 6 }}>
-        <Flex justify="space-between" align="center" marginBottom={6}>
+        <Flex justify="space-between" align="flex-start" gap={4} wrap="wrap" marginBottom={6}>
           <Box>
-            <Text fontSize="2xl" fontWeight="semibold" color="gray.800">Condomínios</Text>
-            <Text fontSize="sm" color="gray.500">{condominios.length} cadastrado(s)</Text>
+            <Text fontSize="2xl" fontWeight="semibold" color="gray.800">Painel do sistema</Text>
+            <Text fontSize="sm" color="gray.500" marginTop={1}>Todos os condomínios, seus síndicos e pendências.</Text>
           </Box>
-          <Button colorScheme="blue" leftIcon={<AddIcon boxSize={2.5} />} onClick={abrirNovo}>Novo condomínio</Button>
+          <Button colorScheme="blue" borderRadius="lg" leftIcon={<AddIcon boxSize={2.5} />} onClick={novo}>Novo condomínio</Button>
+        </Flex>
+
+        <SimpleGrid columns={{ base: 2, md: 4 }} spacing="1px" bg="gray.100" border="1px solid" borderColor="gray.100" borderRadius="xl" overflow="hidden" marginBottom={6}>
+          <Indicador rotulo="Condomínios ativos" valor={ativos.length} />
+          <Indicador rotulo="Apartamentos" valor={ativos.reduce((t, i) => t + i.total_apartamentos, 0)} />
+          <Indicador rotulo="Usuários com acesso" valor={ativos.reduce((t, i) => t + i.total_usuarios, 0)} />
+          <Indicador rotulo="Sem síndico" valor={ativos.filter((i) => i.sindicos.length === 0).length} cor="orange.500" />
+        </SimpleGrid>
+
+        <Flex gap={3} marginBottom={5} align="center" wrap="wrap">
+          <InputGroup maxWidth="380px">
+            <InputLeftElement pointerEvents="none"><SearchIcon color="gray.400" boxSize={3.5} /></InputLeftElement>
+            <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome, cidade, CNPJ ou síndico" bg="white" borderRadius="lg" />
+          </InputGroup>
+          <Button size="sm" variant={mostrarArquivados ? "solid" : "ghost"} onClick={() => setMostrarArquivados(!mostrarArquivados)}>
+            {mostrarArquivados ? "Ocultar arquivados" : "Mostrar arquivados"}
+          </Button>
         </Flex>
 
         {carregando ? (
           <Flex justify="center" padding={16}><Spinner color="blue.500" size="lg" /></Flex>
-        ) : condominios.length === 0 ? (
-          <Box bg="white" borderRadius="xl" padding={10} textAlign="center" boxShadow="sm">
-            <Text color="gray.500">Nenhum condomínio cadastrado ainda.</Text>
+        ) : filtrados.length === 0 ? (
+          <Box bg="white" borderRadius="xl" padding={10} textAlign="center" border="1px solid" borderColor="gray.100">
+            <Text color="gray.500">{itens.length === 0 ? "Nenhum condomínio cadastrado ainda." : "Nenhum condomínio encontrado."}</Text>
+            {itens.length === 0 && <Button marginTop={4} size="sm" colorScheme="blue" leftIcon={<AddIcon />} onClick={novo}>Novo condomínio</Button>}
           </Box>
         ) : (
-          <Box bg="white" borderRadius="xl" boxShadow="sm" overflow="hidden">
-            <TableContainer>
-              <Table size="sm">
-                <Thead bg="gray.50">
-                  <Tr>
-                    <Th>Nome</Th>
-                    <Th>CNPJ</Th>
-                    <Th>Cidade / UF</Th>
-                    <Th>Telefone</Th>
-                    <Th>Status</Th>
-                    <Th>Criado em</Th>
-                    <Th>Ações</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {condominios.map((condominio) => (
-                    <Tr key={condominio.id} opacity={condominio.ativo ? 1 : 0.6}>
-                      <Td fontWeight="semibold">{condominio.nome}</Td>
-                      <Td>{formatarCnpj(condominio.cnpj) || "-"}</Td>
-                      <Td>{[condominio.cidade, condominio.uf].filter(Boolean).join(" / ") || "-"}</Td>
-                      <Td>{formatarTelefone(condominio.telefone) || "-"}</Td>
-                      <Td><Badge colorScheme={condominio.ativo ? "green" : "red"}>{condominio.ativo ? "Ativo" : "Arquivado"}</Badge></Td>
-                      <Td>{formatarData(condominio.created_at)}</Td>
-                      <Td>
-                        <Flex gap={2}>
-                          <Button size="xs" variant="outline" leftIcon={<EditIcon />} onClick={() => abrirEdicao(condominio)}>Editar</Button>
-                          <Button size="xs" variant="ghost" colorScheme={condominio.ativo ? "orange" : "green"} onClick={() => alternarAtivo(condominio)}>
-                            {condominio.ativo ? "Arquivar" : "Restaurar"}
-                          </Button>
-                        </Flex>
-                      </Td>
-                    </Tr>
-                  ))}
-                </Tbody>
-              </Table>
-            </TableContainer>
-          </Box>
+          <SimpleGrid columns={{ base: 1, lg: 2, "2xl": 3 }} spacing={4}>
+            {filtrados.map((item) => {
+              const c = item.condominio;
+              const pendencias = [
+                item.chamados_aguardando > 0 && `${item.chamados_aguardando} chamado(s) aguardando`,
+                item.cotas_atrasadas > 0 && `${item.cotas_atrasadas} cota(s) atrasada(s)`,
+                item.tarefas_atrasadas > 0 && `${item.tarefas_atrasadas} tarefa(s) atrasada(s)`,
+              ].filter(Boolean) as string[];
+              return (
+                <Flex key={c.id} direction="column" bg="white" borderRadius="xl" border="1px solid" borderColor="gray.100" padding={5} gap={4} opacity={c.ativo ? 1 : 0.6}>
+                  <Flex justify="space-between" align="flex-start" gap={3}>
+                    <Box minWidth={0}>
+                      <Flex align="center" gap={2}>
+                        <Text fontWeight="semibold" fontSize="lg" color="gray.800" noOfLines={1}>{c.nome}</Text>
+                        {!c.ativo && <Badge textTransform="none">Arquivado</Badge>}
+                      </Flex>
+                      <Text fontSize="xs" color="gray.500">
+                        {[c.cidade && `${c.cidade}${c.uf ? `/${c.uf}` : ""}`, c.cnpj && `CNPJ ${formatarCnpj(c.cnpj)}`].filter(Boolean).join(" · ") || "Endereço não informado"}
+                      </Text>
+                    </Box>
+                    <Menu placement="bottom-end">
+                      <MenuButton as={IconButton} aria-label="Ações" icon={<ChevronDownIcon />} size="sm" variant="ghost" />
+                      <MenuList fontSize="sm">
+                        <MenuItem onClick={() => editar(c)}>Editar dados</MenuItem>
+                        <MenuItem onClick={() => sindico(item)}>{item.sindicos.length ? "Trocar síndico" : "Designar síndico"}</MenuItem>
+                        <MenuItem color={c.ativo ? "red.600" : undefined} onClick={() => alternarAtivo(c)}>{c.ativo ? "Arquivar" : "Restaurar"}</MenuItem>
+                      </MenuList>
+                    </Menu>
+                  </Flex>
+
+                  <Box bg={item.sindicos.length ? "gray.50" : "orange.50"} borderRadius="lg" paddingX={3} paddingY={2}>
+                    <Text fontSize="2xs" color="gray.500">Síndico</Text>
+                    {item.sindicos.length ? item.sindicos.map((s) => (
+                      <Flex key={s.pessoa_id} align="center" gap={2}>
+                        <Text fontSize="sm" fontWeight="medium">{s.nome}</Text>
+                        {!s.tem_acesso && <Tooltip label="Sem login no sistema" hasArrow><WarningTwoIcon boxSize={3} color="orange.400" /></Tooltip>}
+                        {s.email && <Text fontSize="xs" color="gray.500" noOfLines={1}>{s.email}</Text>}
+                      </Flex>
+                    )) : (
+                      <Flex justify="space-between" align="center" gap={2}>
+                        <Text fontSize="sm" color="orange.700">Sem síndico designado</Text>
+                        {c.ativo && <Button size="xs" colorScheme="orange" onClick={() => sindico(item)}>Designar</Button>}
+                      </Flex>
+                    )}
+                  </Box>
+
+                  <SimpleGrid columns={3} spacing={2}>
+                    <Numero rotulo="Apartamentos" valor={item.total_apartamentos} />
+                    <Numero rotulo="Pessoas" valor={item.total_pessoas} />
+                    <Numero rotulo="Com acesso" valor={item.total_usuarios} />
+                  </SimpleGrid>
+
+                  {pendencias.length > 0 && (
+                    <Flex gap={1.5} wrap="wrap">
+                      {pendencias.map((p) => <Badge key={p} colorScheme="red" variant="subtle" textTransform="none">{p}</Badge>)}
+                    </Flex>
+                  )}
+
+                  {c.ativo && <Button size="sm" colorScheme="blue" variant="outline" marginTop="auto" onClick={() => entrar(c)}>Entrar no condomínio</Button>}
+                </Flex>
+              );
+            })}
+          </SimpleGrid>
         )}
 
-        <Modal isOpen={modal.isOpen} onClose={modal.onClose} size="2xl" isCentered scrollBehavior="inside">
-          <ModalOverlay />
-          <ModalContent>
-            <ModalHeader>{editando ? "Editar condomínio" : "Novo condomínio"}</ModalHeader>
-            <ModalCloseButton />
-            <ModalBody>
-              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-                <Box gridColumn={{ md: "span 2" }}>{campoTexto("nome", "Nome")}</Box>
-                {campoTexto("cnpj", "CNPJ", { placeholder: "00.000.000/0000-00" })}
-                {campoTexto("telefone", "Telefone", { placeholder: "(00) 0000-0000" })}
-                <Box gridColumn={{ md: "span 2" }}>{campoTexto("email", "E-mail", { type: "email" })}</Box>
-                {campoTexto("cep", "CEP", { placeholder: "00000-000" })}
-                {campoTexto("logradouro", "Endereço (rua, avenida)", { placeholder: "Ex.: Rua das Flores" })}
-                {campoTexto("numero", "Número")}
-                {campoTexto("complemento", "Complemento")}
-                {campoTexto("bairro", "Bairro")}
-                {campoTexto("cidade", "Cidade")}
-                <FormControl>
-                  <FormLabel fontSize="sm">UF</FormLabel>
-                  <Select size="sm" value={formulario.uf} onChange={(e) => alterar("uf", e.target.value)} placeholder="Selecione">
-                    {UFS.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
-                  </Select>
-                </FormControl>
-              </SimpleGrid>
-            </ModalBody>
-            <ModalFooter gap={3}>
-              <Button variant="ghost" onClick={modal.onClose}>Cancelar</Button>
-              <Button colorScheme="blue" onClick={salvar} isLoading={salvando}>{editando ? "Salvar" : "Cadastrar"}</Button>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
+        <ModalCondominio aberto={modalCondominio.isOpen} aoFechar={modalCondominio.onClose} condominio={editando} aoSalvo={aoSalvo} />
+        <ModalSindico aberto={modalSindico.isOpen} aoFechar={modalSindico.onClose} item={itemSindico} aoDesignado={carregar} />
       </Box>
     </Flex>
   );

@@ -17,6 +17,7 @@ import {
 import { AddIcon, DeleteIcon, EditIcon, SearchIcon } from "@chakra-ui/icons";
 
 import { Titulo } from "../Titulos/Titulos";
+import { usePermissoes } from "../../Components/permissoes";
 import { formatarPlaca } from "../../Components/config";
 import { rotuloApartamento } from "../Pessoas/ConfigPessoas";
 import { IconeCarro, IconeUsuario, IconeVaga } from "../Pessoas/IconesPessoas";
@@ -40,6 +41,7 @@ const Indicador = ({ icone: Icone, rotulo, valor }: { icone: ElementType; rotulo
 
 export const Veiculos = () => {
   const toast = useToast();
+  const permissoes = usePermissoes();
   const modal = useDisclosure();
 
   const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
@@ -171,7 +173,7 @@ export const Veiculos = () => {
             <Text fontSize="2xl" fontWeight="semibold" color="gray.800">Veículos</Text>
             <Text fontSize="sm" color="gray.500" marginTop={1}>Todos os veículos do condomínio, com unidade, vaga e condutor.</Text>
           </Box>
-          <Button colorScheme="blue" borderRadius="lg" leftIcon={<AddIcon boxSize={2.5} />} onClick={abrirNovo}>Novo veículo</Button>
+          {permissoes.editaUnidade && <Button colorScheme="blue" borderRadius="lg" leftIcon={<AddIcon boxSize={2.5} />} onClick={abrirNovo}>Novo veículo</Button>}
         </Flex>
 
         {!carregando && veiculos.length > 0 && (
@@ -204,7 +206,7 @@ export const Veiculos = () => {
           <Flex direction="column" align="center" padding={16}>
             <IconeCarro boxSize={6} color="gray.400" />
             <Text marginTop={3} color="gray.700" fontWeight="medium">Nenhum veículo cadastrado</Text>
-            <Button marginTop={5} size="sm" colorScheme="blue" leftIcon={<AddIcon />} onClick={abrirNovo}>Novo veículo</Button>
+            {permissoes.editaUnidade && <Button marginTop={5} size="sm" colorScheme="blue" leftIcon={<AddIcon />} onClick={abrirNovo}>Novo veículo</Button>}
           </Flex>
         ) : filtrados.length === 0 ? (
           <Flex direction="column" align="center" padding={16}>
@@ -244,8 +246,8 @@ export const Veiculos = () => {
                       <Td fontSize="sm">{veiculo.condutor_nome ?? "-"}</Td>
                       <Td>
                         <Flex gap={1} justify="flex-end">
-                          <Tooltip label="Editar" hasArrow><IconButton aria-label="Editar" icon={<EditIcon />} size="xs" variant="ghost" onClick={() => abrirEdicao(veiculo)} /></Tooltip>
-                          <Tooltip label="Excluir" hasArrow><IconButton aria-label="Excluir" icon={<DeleteIcon />} size="xs" variant="ghost" colorScheme="red" onClick={() => excluir(veiculo)} /></Tooltip>
+                          {permissoes.editaUnidade && <Tooltip label="Editar" hasArrow><IconButton aria-label="Editar" icon={<EditIcon />} size="xs" variant="ghost" onClick={() => abrirEdicao(veiculo)} /></Tooltip>}
+                          {permissoes.editaUnidade && <Tooltip label="Excluir" hasArrow><IconButton aria-label="Excluir" icon={<DeleteIcon />} size="xs" variant="ghost" colorScheme="red" onClick={() => excluir(veiculo)} /></Tooltip>}
                         </Flex>
                       </Td>
                     </Tr>

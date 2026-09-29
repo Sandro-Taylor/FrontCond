@@ -6,6 +6,7 @@
 //    residentes ligados a cada um, com parentesco
 //  - vagas fixas da unidade (novas ou vagas livres já cadastradas)
 //  - veículos: vaga fixa da unidade ou rotativo, e condutor
+//  - financeiro: cotas da unidade (só leitura; lançamentos na página Financeiro)
 // ---------------------------------------------------------
 
 import { Fragment, useCallback, useEffect, useState } from "react";
@@ -14,11 +15,13 @@ import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import {
   Badge, Box, Button, Flex, FormControl, FormLabel, IconButton, Input, Modal, ModalBody, ModalCloseButton,
   ModalContent, ModalFooter, ModalHeader, ModalOverlay, Select, SimpleGrid, Spinner, Table, TableContainer, Tbody,
-  Td, Text, Th, Thead, Tooltip, Tr, useDisclosure, useToast,
+  Td, Text, Th, Thead, Tooltip, Tr, useDisclosure, useToast, Icon,
 } from "@chakra-ui/react";
+import { Wallet } from "lucide-react";
 import { AddIcon, ArrowBackIcon, DeleteIcon, EditIcon, LinkIcon } from "@chakra-ui/icons";
 
 import { Titulo } from "../Titulos/Titulos";
+import { usePermissoes } from "../../Components/permissoes";
 import { formatarCpf, formatarPlaca, formatarTelefone } from "../../Components/config";
 import { editarPessoa } from "../Pessoas/API/EditarPessoa";
 import { ROTULOS_PARENTESCO, ROTULOS_TIPO_RELACAO, rotuloApartamento, type PessoaDados, type TipoRelacao } from "../Pessoas/ConfigPessoas";
@@ -26,6 +29,8 @@ import { IconeCarro, IconePredio, IconeUsuario, IconeVaga } from "../Pessoas/Ico
 import { apiVagas, type Vaga } from "../Vagas/ConfigVagas";
 import { apiApartamentos } from "./API";
 import { ModalAdicionarPessoa, ModalEditarPessoa } from "./FormulariosPessoa";
+import { apiFinanceiro, type Cota } from "../Financeiro/ConfigFinanceiro";
+import { TabelaCotas } from "../Financeiro/TabelaCotas";
 import {
   OCUPACAO, type ApartamentoDetalhe, type VagaApartamento, type VeiculoApartamento, type VeiculoDados, type VinculoApartamento, type VinculoDados,
 } from "./ConfigApartamentos";
@@ -49,7 +54,7 @@ const Resumo = ({ icone: Icone, rotulo, valor }: { icone: ElementType; rotulo: s
   </Box>
 );
 
-const Secao = ({ icone: Icone, titulo, contador, acoes, children }: { icone: ElementType; titulo: string; contador: number; acoes: ReactNode; children: ReactNode }) => (
+const Secao = ({ icone: Icone, titulo, contador, acoes, children }: { icone: ElementType; titulo: string; contador: number; acoes?: ReactNode; children: ReactNode }) => (
   <Box bg="white" borderRadius="xl" border="1px solid" borderColor="gray.100" marginBottom={6} overflow="hidden">
     <Flex justify="space-between" align="center" paddingX={5} paddingY={4} borderBottom="1px solid" borderColor="gray.100" gap={3} wrap="wrap">
       <Flex align="center" gap={2}>
@@ -77,10 +82,42 @@ const Acao = ({ rotulo, icone, cor, onClick }: { rotulo: string; icone: React.Re
 // PÁGINA
 // ---------------------------------------------------------
 
+const IconeFinanceiro = (props: object) => <Icon as={Wallet} {...props} />;
+
+// cotas da unidade (quem tem acesso ao financeiro)
+const SecaoFinanceiro = ({ apartamentoId }: { apartamentoId: string }) => {
+  const toast = useToast();
+  const [cotas, setCotas] = useState<Cota[] | null>(null);
+
+  useEffect(() => {
+    apiFinanceiro.listar({ apartamento_id: apartamentoId })
+      .then(setCotas)
+      .catch((erro) => { setCotas([]); toast({ title: erro instanceof Error ? erro.message : "Erro ao carregar as cotas", status: "error" }); });
+  }, [apartamentoId, toast]);
+
+  const emAberto = (cotas ?? []).filter((c) => c.status === "ABERTA").length;
+  return (
+    <Secao icone={IconeFinanceiro} titulo="Financeiro" contador={cotas?.length ?? 0}
+      acoes={<>
+        {emAberto > 0 && <Badge colorScheme="yellow" textTransform="none">{emAberto} em aberto</Badge>}
+        <Button as={RouterLink} to="/Financeiro" size="xs" variant="ghost">Abrir financeiro</Button>
+      </>}>
+      {cotas === null ? (
+        <Flex justify="center" padding={6}><Spinner size="sm" color="blue.500" /></Flex>
+      ) : cotas.length === 0 ? (
+        <Vazio>Nenhuma cota lançada para esta unidade.</Vazio>
+      ) : (
+        <Box borderTop="none"><TabelaCotas cotas={cotas} mostrarApartamento={false} /></Box>
+      )}
+    </Secao>
+  );
+};
+
 export const ApartamentoPagina = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const permissoes = usePermissoes();
 
   const [apto, setApto] = useState<ApartamentoDetalhe | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -330,8 +367,8 @@ export const ApartamentoPagina = () => {
       <Td fontSize="sm">{vinculo.pessoa.email ?? "-"}</Td>
       <Td>
         <Flex gap={1} justify="flex-end">
-          <Acao rotulo="Editar" icone={<EditIcon />} onClick={() => abrirEdicaoPessoa(vinculo)} />
-          <Acao rotulo="Remover do apartamento" icone={<DeleteIcon />} cor="red" onClick={() => removerPessoa(vinculo)} />
+          {permissoes.editaUnidade && <Acao rotulo="Editar" icone={<EditIcon />} onClick={() => abrirEdicaoPessoa(vinculo)} />}
+          {permissoes.editaUnidade && <Acao rotulo="Remover do apartamento" icone={<DeleteIcon />} cor="red" onClick={() => removerPessoa(vinculo)} />}
         </Flex>
       </Td>
     </Tr>
@@ -342,7 +379,7 @@ export const ApartamentoPagina = () => {
       <Titulo />
       <Box flex={1} minWidth={0} paddingY={6} paddingRight={{ md: 6 }}>
         {/* CABEÇALHO */}
-        <Button as={RouterLink} to="/Apartamentos" size="sm" variant="ghost" leftIcon={<ArrowBackIcon />} marginBottom={3} marginLeft={-3}>Apartamentos</Button>
+        <Button as={RouterLink} to="/Apartamentos" size="sm" variant="ghost" leftIcon={<ArrowBackIcon />} marginBottom={3} marginLeft={-3}>{permissoes.veTudo ? "Apartamentos" : "Minhas unidades"}</Button>
         <Flex justify="space-between" align="flex-start" gap={4} wrap="wrap" marginBottom={6}>
           <Box>
             <Flex align="center" gap={3} wrap="wrap">
@@ -354,10 +391,12 @@ export const ApartamentoPagina = () => {
               {[apto.andar !== null ? `${apto.andar}º andar` : "Andar não informado", apto.observacao].filter(Boolean).join(" · ")}
             </Text>
           </Box>
-          <Flex gap={2}>
-            <Button size="sm" leftIcon={<EditIcon />} onClick={abrirEdicaoUnidade}>Editar unidade</Button>
-            <Button size="sm" variant="ghost" colorScheme="red" leftIcon={<DeleteIcon />} onClick={excluirUnidade}>Excluir</Button>
-          </Flex>
+          {permissoes.editaTudo && (
+            <Flex gap={2}>
+              <Button size="sm" leftIcon={<EditIcon />} onClick={abrirEdicaoUnidade}>Editar unidade</Button>
+              <Button size="sm" variant="ghost" colorScheme="red" leftIcon={<DeleteIcon />} onClick={excluirUnidade}>Excluir</Button>
+            </Flex>
+          )}
         </Flex>
 
         {/* RESUMO */}
@@ -370,7 +409,7 @@ export const ApartamentoPagina = () => {
 
         {/* PESSOAS */}
         <Secao icone={IconeUsuario} titulo="Pessoas" contador={apto.pessoas.length}
-          acoes={<Button size="sm" colorScheme="blue" leftIcon={<AddIcon boxSize={2.5} />} onClick={modalAddPessoa.onOpen}>Adicionar pessoa</Button>}>
+          acoes={permissoes.editaUnidade && <Button size="sm" colorScheme="blue" leftIcon={<AddIcon boxSize={2.5} />} onClick={modalAddPessoa.onOpen}>Adicionar pessoa</Button>}>
           {apto.pessoas.length === 0 ? (
             <Vazio>Nenhuma pessoa ligada. Comece adicionando o proprietário.</Vazio>
           ) : (
@@ -401,12 +440,12 @@ export const ApartamentoPagina = () => {
 
         {/* VAGAS */}
         <Secao icone={IconeVaga} titulo="Vagas fixas da unidade" contador={apto.vagas.length}
-          acoes={
+          acoes={permissoes.editaTudo && (
             <>
               <Button size="sm" variant="outline" leftIcon={<LinkIcon />} onClick={abrirVincularVaga}>Vincular vaga livre</Button>
               <Button size="sm" colorScheme="blue" leftIcon={<AddIcon boxSize={2.5} />} onClick={abrirNovaVaga}>Nova vaga</Button>
             </>
-          }>
+          )}>
           {apto.vagas.length === 0 ? (
             <Vazio>A unidade não tem vaga fixa. Os veículos dela usam as vagas rotativas.</Vazio>
           ) : (
@@ -430,8 +469,8 @@ export const ApartamentoPagina = () => {
                         <Td fontSize="sm">{naVaga.map((v) => formatarPlaca(v.placa) || v.modelo).join(", ") || "Livre"}</Td>
                         <Td>
                           <Flex gap={1} justify="flex-end">
-                            <Acao rotulo="Editar" icone={<EditIcon />} onClick={() => abrirEdicaoVaga(vaga)} />
-                            <Acao rotulo="Liberar da unidade" icone={<DeleteIcon />} cor="red" onClick={() => liberarVaga(vaga)} />
+                            {permissoes.editaTudo && <Acao rotulo="Editar" icone={<EditIcon />} onClick={() => abrirEdicaoVaga(vaga)} />}
+                            {permissoes.editaTudo && <Acao rotulo="Liberar da unidade" icone={<DeleteIcon />} cor="red" onClick={() => liberarVaga(vaga)} />}
                           </Flex>
                         </Td>
                       </Tr>
@@ -445,7 +484,7 @@ export const ApartamentoPagina = () => {
 
         {/* VEÍCULOS */}
         <Secao icone={IconeCarro} titulo="Veículos" contador={apto.veiculos.length}
-          acoes={<Button size="sm" colorScheme="blue" leftIcon={<AddIcon boxSize={2.5} />} onClick={abrirNovoVeiculo}>Adicionar veículo</Button>}>
+          acoes={permissoes.editaUnidade && <Button size="sm" colorScheme="blue" leftIcon={<AddIcon boxSize={2.5} />} onClick={abrirNovoVeiculo}>Adicionar veículo</Button>}>
           {apto.veiculos.length === 0 ? (
             <Vazio>Nenhum veículo cadastrado.</Vazio>
           ) : (
@@ -475,8 +514,8 @@ export const ApartamentoPagina = () => {
                       <Td fontSize="sm">{veiculo.condutor_nome ?? "-"}</Td>
                       <Td>
                         <Flex gap={1} justify="flex-end">
-                          <Acao rotulo="Editar" icone={<EditIcon />} onClick={() => abrirEdicaoVeiculo(veiculo)} />
-                          <Acao rotulo="Excluir" icone={<DeleteIcon />} cor="red" onClick={() => excluirVeiculo(veiculo)} />
+                          {permissoes.editaUnidade && <Acao rotulo="Editar" icone={<EditIcon />} onClick={() => abrirEdicaoVeiculo(veiculo)} />}
+                          {permissoes.editaUnidade && <Acao rotulo="Excluir" icone={<DeleteIcon />} cor="red" onClick={() => excluirVeiculo(veiculo)} />}
                         </Flex>
                       </Td>
                     </Tr>
@@ -486,6 +525,9 @@ export const ApartamentoPagina = () => {
             </TableContainer>
           )}
         </Secao>
+
+        {/* FINANCEIRO */}
+        {permissoes.acessaFinanceiro && <SecaoFinanceiro apartamentoId={aptoId} />}
 
         {/* ================= MODAIS ================= */}
 

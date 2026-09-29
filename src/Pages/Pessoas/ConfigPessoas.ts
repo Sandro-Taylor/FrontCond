@@ -2,7 +2,8 @@
 // TIPOS E RÓTULOS DE PESSOAS
 // ---------------------------------------------------------
 
-export type PerfilPessoa = "MORADOR" | "SINDICO" | "CONSELHEIRO" | "COLABORADOR" | "PRESTADOR";
+export type PerfilPessoa = "MORADOR" | "SINDICO" | "CONSELHEIRO" | "FUNCIONARIO" | "PRESTADOR";
+export type VinculoFuncionario = "PROPRIO" | "TERCEIRIZADO" | "AUTONOMO";
 export type TipoRelacao = "PROPRIETARIO" | "INQUILINO" | "RESIDENTE";
 export type Parentesco =
   | "CONJUGE" | "FILHO" | "ENTEADO" | "PAI_MAE" | "SOGRO" | "IRMAO"
@@ -12,8 +13,17 @@ export const ROTULOS_PERFIL: Record<PerfilPessoa, string> = {
   MORADOR: "Morador",
   SINDICO: "Síndico",
   CONSELHEIRO: "Conselheiro",
-  COLABORADOR: "Colaborador",
+  FUNCIONARIO: "Funcionário",
   PRESTADOR: "Prestador de serviço",
+};
+
+// cargos eleitos: só o ADM do sistema atribui, altera ou retira
+export const PERFIS_SO_ADM: PerfilPessoa[] = ["SINDICO", "CONSELHEIRO"];
+
+export const ROTULOS_VINCULO_FUNCIONARIO: Record<VinculoFuncionario, string> = {
+  PROPRIO: "Contratado pelo condomínio",
+  TERCEIRIZADO: "Terceirizado",
+  AUTONOMO: "Autônomo",
 };
 
 export const ROTULOS_TIPO_RELACAO: Record<TipoRelacao, string> = {
@@ -66,6 +76,20 @@ export type VeiculoDaPessoa = {
   cor: string | null;
 };
 
+// ficha do funcionário (porteiro, zelador...)
+export type FichaFuncionario = {
+  cargo_id: string;
+  cargo_nome: string;
+  vinculo: VinculoFuncionario;
+  empresa: string | null;
+  turno: string | null;
+  data_admissao: string | null;
+};
+
+export type FichaFuncionarioDados = Omit<FichaFuncionario, "cargo_nome">;
+
+export type Cargo = { id: string; nome: string; ativo: boolean };
+
 export type Pessoa = {
   id: string;
   user_id: string | null;
@@ -79,6 +103,7 @@ export type Pessoa = {
   created_at: string;
   apartamentos: VinculoDaPessoa[];
   veiculos: VeiculoDaPessoa[]; // veículos em que a pessoa é condutor
+  funcionario: FichaFuncionario | null;
 };
 
 // ======================================================
@@ -95,6 +120,7 @@ export type PessoaDados = {
 
 export type PessoaCriarDados = PessoaDados & {
   perfil: PerfilPessoa;
+  funcionario?: FichaFuncionarioDados | null; // obrigatória para FUNCIONARIO
 };
 
 export type PessoaEditarDados = PessoaDados & {
@@ -126,13 +152,13 @@ export function descreverVinculo(vinculo: { tipo_relacao: TipoRelacao; reside: b
 // CATEGORIA (como a pessoa aparece na tela Pessoas)
 // ======================================================
 
-export type Categoria = "PROPRIETARIO" | "INQUILINO" | "RESIDENTE" | "COLABORADOR" | "PRESTADOR" | "GESTAO" | "SEM_VINCULO";
+export type Categoria = "PROPRIETARIO" | "INQUILINO" | "RESIDENTE" | "FUNCIONARIO" | "PRESTADOR" | "GESTAO" | "SEM_VINCULO";
 
 export const ROTULOS_CATEGORIA: Record<Categoria, { rotulo: string; cor: string }> = {
   PROPRIETARIO: { rotulo: "Proprietário", cor: "purple" },
   INQUILINO: { rotulo: "Inquilino", cor: "blue" },
   RESIDENTE: { rotulo: "Residente", cor: "teal" },
-  COLABORADOR: { rotulo: "Colaborador", cor: "orange" },
+  FUNCIONARIO: { rotulo: "Funcionário", cor: "orange" },
   PRESTADOR: { rotulo: "Prestador de serviço", cor: "yellow" },
   GESTAO: { rotulo: "Síndico / Conselho", cor: "red" },
   SEM_VINCULO: { rotulo: "Sem vínculo", cor: "gray" },
@@ -140,11 +166,16 @@ export const ROTULOS_CATEGORIA: Record<Categoria, { rotulo: string; cor: string 
 
 export function categoriaPessoa(pessoa: Pessoa): Categoria {
   if (pessoa.perfil === "SINDICO" || pessoa.perfil === "CONSELHEIRO") return "GESTAO";
-  if (pessoa.perfil === "COLABORADOR") return "COLABORADOR";
+  if (pessoa.perfil === "FUNCIONARIO") return "FUNCIONARIO";
   if (pessoa.perfil === "PRESTADOR") return "PRESTADOR";
   const ativos = pessoa.apartamentos.filter((v) => v.ativo);
   if (ativos.some((v) => v.tipo_relacao === "PROPRIETARIO")) return "PROPRIETARIO";
   if (ativos.some((v) => v.tipo_relacao === "INQUILINO")) return "INQUILINO";
   if (ativos.some((v) => v.tipo_relacao === "RESIDENTE")) return "RESIDENTE";
   return "SEM_VINCULO";
+}
+
+// "Funcionário · Porteiro"
+export function rotuloPerfilCompleto(pessoa: Pick<Pessoa, "perfil" | "funcionario">) {
+  return pessoa.funcionario ? `${ROTULOS_PERFIL[pessoa.perfil]} · ${pessoa.funcionario.cargo_nome}` : ROTULOS_PERFIL[pessoa.perfil];
 }

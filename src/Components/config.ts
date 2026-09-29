@@ -5,6 +5,8 @@
 // formatações de exibição (datas, CPF, telefone...).
 // ---------------------------------------------------------
 
+import { API_BASE_URL_USERS } from "../config";
+
 const CHAVE_TOKEN = "access_token";
 const CHAVE_CONDOMINIO = "condominio_id";
 const FUSO = "America/Sao_Paulo";
@@ -90,4 +92,20 @@ export function formatarCep(valor: string | null | undefined) {
   if (!valor) return "";
   const cep = valor.replace(/\D/g, "").slice(0, 8);
   return cep.length > 5 ? `${cep.slice(0, 5)}-${cep.slice(5)}` : cep;
+}
+
+export function formatarDataHora(data: string) {
+  return new Date(data).toLocaleString("pt-BR", { timeZone: FUSO, day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+// CHAMADAS À API: devolve o JSON ou lança Error com a mensagem do backend
+export async function chamarApi<T>(caminho: string, metodo: string, padrao: string, corpo?: unknown): Promise<T> {
+  const response = await fetch(`${API_BASE_URL_USERS}${caminho}`, {
+    method: metodo,
+    headers: cabecalhos(),
+    body: corpo === undefined ? undefined : JSON.stringify(corpo),
+  });
+  if (!response.ok) throw new Error(await mensagemErro(response, padrao));
+  if (response.status === 204) return undefined as T;
+  return response.json();
 }

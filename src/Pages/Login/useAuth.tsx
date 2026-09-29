@@ -7,7 +7,7 @@ import type { ValuesInputType } from "./helper";
 import { API_BASE_URL_USERS } from "../../config";
 import { definirCondominioAtual, obterCondominioAtual } from "../../Components/config";
 
-export type Perfil = "ADM" | "SINDICO" | "CONSELHEIRO" | "MORADOR" | "COLABORADOR" | "PRESTADOR";
+export type Perfil = "ADM" | "SINDICO" | "CONSELHEIRO" | "MORADOR" | "FUNCIONARIO" | "PRESTADOR";
 
 export type CondominioDoUsuario = {
   id: string;
@@ -22,6 +22,7 @@ type User = {
   email: string;
   status: string;
   admin_sistema: boolean;
+  trocar_senha: boolean; // senha temporária: troca obrigatória antes de usar o sistema
   created_at: string;
   condominios: CondominioDoUsuario[];
 };
