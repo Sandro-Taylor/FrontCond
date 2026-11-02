@@ -100,6 +100,9 @@ export type Pessoa = {
   telefone: string | null;
   data_nascimento: string | null;
   ativo: boolean;
+  responsavel_user_id: string | null; // responsável do WhatsApp; vazio = síndico do prédio
+  responsavel_nome: string | null;
+  foto_arquivo_id: string | null; // foto no Google Drive (via /arquivos/<id>)
   created_at: string;
   apartamentos: VinculoDaPessoa[];
   veiculos: VeiculoDaPessoa[]; // veículos em que a pessoa é condutor
@@ -116,6 +119,7 @@ export type PessoaDados = {
   email: string | null;
   telefone: string | null;
   data_nascimento: string | null;
+  responsavel_user_id?: string | null; // só enviado quando escolhido; vazio = síndico do prédio
 };
 
 export type PessoaCriarDados = PessoaDados & {

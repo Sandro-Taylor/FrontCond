@@ -11,15 +11,17 @@
 import { useEffect, useState } from "react";
 import type { ElementType, KeyboardEvent, ReactNode } from "react";
 import {
-  Alert, AlertIcon, Avatar, Badge, Box, Button, Divider, Flex, FormControl, FormLabel, Input, InputGroup, InputLeftElement,
+  Alert, AlertIcon, Badge, Box, Button, Divider, Flex, FormControl, FormLabel, Input, InputGroup, InputLeftElement,
   Modal, ModalBody, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalOverlay, Select, SimpleGrid, Spinner,
   Table, TableContainer, Tbody, Td, Text, Th, Thead, Tr, VStack, createIcon, useDisclosure, useToast,
 } from "@chakra-ui/react";
 import { AddIcon, CalendarIcon, CheckCircleIcon, ChevronRightIcon, CopyIcon, DeleteIcon, EmailIcon, InfoOutlineIcon, LockIcon, PhoneIcon, RepeatIcon, SearchIcon, TimeIcon, UnlockIcon } from "@chakra-ui/icons";
 import { Titulo } from "../Titulos/Titulos";
 import { CelulaEditavel } from "../../Components/CelulaEditavel";
+import { FotoPessoa } from "../../Components/Arquivos";
 import { formatarCpf, formatarData, formatarDataIso, formatarPlaca, formatarTelefone } from "../../Components/config";
 import { CriarPessoa } from "./PessoasCriar";
+import { SeletorResponsavel, useOpcoesResponsavel } from "./CampoResponsavel";
 import { usePessoas } from "./Hooks/Pessoas";
 import { darAcesso, gerarNovaSenha, removerAcesso, type AcessoResultado } from "./API/AcessoPessoa";
 import { usePermissoes } from "../../Components/permissoes";
@@ -226,6 +228,8 @@ export const Pessoas = () => {
 
   const contar = (...categorias: Categoria[]) => pessoas.filter((p) => categorias.includes(categoriaPessoa(p))).length;
 
+  const opcoesResponsavel = useOpcoesResponsavel(permissoes.veTudo);
+
   function abrirDetalhes(pessoa: Pessoa) { setPessoaSelecionada(pessoa); modalDetalhes.onOpen(); }
 
   async function editarCampo(pessoa: Pessoa, campo: keyof PessoaEditarDados, valor: string | boolean | null) {
@@ -298,9 +302,9 @@ export const Pessoas = () => {
   }
 
   return (
-    <Flex align="flex-start" gap={6} direction={{ base: "column", md: "row" }}>
+    <Flex align="flex-start" gap={{ base: 0, md: 6 }} direction={{ base: "column", md: "row" }}>
       <Titulo />
-      <Box flex={1} minWidth={0} paddingY={6} paddingRight={{ md: 6 }}>
+      <Box flex={1} minWidth={0} paddingY={6} paddingX={{ base: 4, md: 0 }} paddingRight={{ md: 6 }}>
         <Flex justify="space-between" align="flex-start" gap={4} wrap="wrap" marginBottom={6}>
           <Box>
             <Text fontSize="2xl" fontWeight="semibold" color="gray.800">Pessoas</Text>
@@ -379,7 +383,7 @@ export const Pessoas = () => {
                   _hover={{ borderColor: "blue.200", boxShadow: "0 8px 24px rgba(16,24,40,.07)" }}>
                   <Flex align="center" justify="space-between" gap={3} padding={5}>
                     <Flex align="center" gap={3} minWidth={0}>
-                      <Avatar name={pessoa.nome} size="md" bg="blue.500" color="white" />
+                      <FotoPessoa nome={pessoa.nome} fotoId={pessoa.foto_arquivo_id} tamanho="md" />
                       <Box minWidth={0}>
                         <Text fontWeight="semibold" color="gray.800" noOfLines={1}>{pessoa.nome}</Text>
                         <Text fontSize="sm" color="gray.500">{pessoa.cpf ? formatarCpf(pessoa.cpf) : "CPF não informado"}</Text>
@@ -470,7 +474,9 @@ export const Pessoas = () => {
               <>
                 <ModalHeader bg="gray.50" borderTopRadius="2xl" padding={6}>
                   <Flex align="center" gap={4}>
-                    <Avatar name={pessoaSelecionada.nome} size="xl" bg="blue.500" color="white" />
+                    <FotoPessoa nome={pessoaSelecionada.nome} fotoId={pessoaSelecionada.foto_arquivo_id} tamanho="xl"
+                      pessoaId={pessoaSelecionada.id} editavel={permissoes.editaUnidade}
+                      aoMudar={(foto) => { setPessoaSelecionada({ ...pessoaSelecionada, foto_arquivo_id: foto }); carregarPessoas(); }} />
                     <Box>
                       <Text fontSize="xl" fontWeight="semibold">{pessoaSelecionada.nome}</Text>
                       <Flex gap={2} marginTop={2} wrap="wrap">
@@ -510,6 +516,11 @@ export const Pessoas = () => {
                         ))}
                       </Select>
                       {!ehAdm && permissoes.editaTudo && <Text fontSize="2xs" color="gray.500" marginTop={1}>Síndico e conselheiros são designados pelo administrador do sistema.</Text>}
+                    </Campo>
+                    <Campo icone={PhoneIcon} rotulo="Responsável (WhatsApp)">
+                      <SeletorResponsavel tamanho="sm" opcoes={opcoesResponsavel} desabilitado={!ehAdm}
+                        valor={pessoaSelecionada.responsavel_user_id} nomeAtual={pessoaSelecionada.responsavel_nome}
+                        aoMudar={(valor) => editarCampo(pessoaSelecionada, "responsavel_user_id", valor)} />
                     </Campo>
                     <Campo icone={CheckCircleIcon} rotulo="Situação">
                       <Select size="sm" isDisabled={!permissoes.editaTudo || protegida(pessoaSelecionada)} value={pessoaSelecionada.ativo ? "ativo" : "inativo"} onChange={(e) => editarCampo(pessoaSelecionada, "ativo", e.target.value === "ativo")}>

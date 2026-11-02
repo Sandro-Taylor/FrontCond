@@ -1,4 +1,4 @@
-import { BrowserRouter, Link as RouterLink, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Link as RouterLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Button, Center, Spinner, Text, VStack } from "@chakra-ui/react";
 
 import { useAuth } from "./Pages/Login/useAuth";
@@ -17,6 +17,14 @@ import { Avisos } from "./Pages/Avisos/Avisos";
 import { Atendimento } from "./Pages/Atendimento/Atendimento";
 import { Tarefas } from "./Pages/Tarefas/Tarefas";
 import { Usuarios } from "./Pages/Usuarios/Usuarios";
+import { WhatsApp } from "./Pages/WhatsApp/WhatsApp";
+import { Administracao } from "./Pages/Administracao/Administracao";
+import { Drive } from "./Pages/Drive/Drive";
+import { Movimentacoes } from "./Pages/Movimentacoes/Movimentacoes";
+import { FracaoIdeal } from "./Pages/FracaoIdeal/FracaoIdeal";
+import { Manutencoes } from "./Pages/Manutencoes/Manutencoes";
+import { Prestadores } from "./Pages/Prestadores/Prestadores";
+import { PopupWhatsApp } from "./Pages/WhatsApp/PopupWhatsApp";
 
 import { ROTAS } from "./Pages/Titulos/Titulos";
 
@@ -29,6 +37,7 @@ interface ProtectedProps {
 
 const Protected = ({ Item, exigeCondominio, exige }: ProtectedProps) => {
   const { logged, isLoading, user, condominioAtual, logout } = useAuth();
+  const { pathname } = useLocation();
 
   if (isLoading) {
     return (
@@ -45,6 +54,13 @@ const Protected = ({ Item, exigeCondominio, exige }: ProtectedProps) => {
   // primeiro acesso com senha temporária: só libera depois da troca
   if (user?.trocar_senha) {
     return <TrocarSenhaObrigatoria />;
+  }
+
+  // RESPONSÁVEL sem condomínio: só usa o WhatsApp (e a troca de senha)
+  if (!condominioAtual && !user?.admin_sistema && user?.responsavel) {
+    const liberada = [ROTAS.WHATSAPP, ROTAS.TROCAR_SENHA].some((rota) => pathname.toLowerCase() === rota.toLowerCase());
+    if (!liberada) return <Navigate to={ROTAS.WHATSAPP} replace />;
+    return <Item key="sem-condominio" />;
   }
 
   // usuário sem nenhum condomínio liberado (o ADM do sistema continua entrando para cadastrar condomínios)
@@ -165,11 +181,49 @@ export const RoutesApp = () => {
         />
 
         <Route
+          path={ROTAS.MOVIMENTACOES}
+          element={<Protected Item={Movimentacoes} exigeCondominio exige="veFinanceiroTudo" />}
+        />
+
+        <Route
+          path={ROTAS.FRACAO_IDEAL}
+          element={<Protected Item={FracaoIdeal} exigeCondominio exige="veFinanceiroTudo" />}
+        />
+
+        <Route
+          path={ROTAS.MANUTENCOES}
+          element={<Protected Item={Manutencoes} exigeCondominio exige="veTudo" />}
+        />
+
+        <Route
+          path={ROTAS.PRESTADORES}
+          element={<Protected Item={Prestadores} exigeCondominio exige="veFinanceiroTudo" />}
+        />
+
+        <Route
+          path={ROTAS.DRIVE}
+          element={<Protected Item={Drive} />}
+        />
+
+        <Route
+          path={ROTAS.ADMINISTRACAO}
+          element={<Protected Item={Administracao} />}
+        />
+
+        <Route
+          path={ROTAS.WHATSAPP}
+          element={<Protected Item={WhatsApp} />}
+        />
+
+        <Route
           path="*"
           element={<Navigate to={ROTAS.INICIO} replace />}
         />
 
       </Routes>
+
+      {/* mensagens novas do WhatsApp (só o RESPONSÁVEL) */}
+      <PopupWhatsApp />
     </BrowserRouter>
   );
 };

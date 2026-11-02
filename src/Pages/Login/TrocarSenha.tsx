@@ -92,9 +92,9 @@ export const TrocarSenhaObrigatoria = () => (
 
 // página "Trocar senha" do menu
 export const TrocarSenha = () => (
-  <Flex align="flex-start" gap={6} direction={{ base: "column", md: "row" }}>
+  <Flex align="flex-start" gap={{ base: 0, md: 6 }} direction={{ base: "column", md: "row" }}>
     <Titulo />
-    <Box flex={1} paddingY={8} paddingRight={{ md: 6 }}>
+    <Box flex={1} paddingY={8} paddingX={{ base: 4, md: 0 }} paddingRight={{ md: 6 }}>
       <Text fontSize="2xl" fontWeight="semibold" color="gray.800" marginBottom={6}>Trocar senha</Text>
       <FormularioSenha obrigatoria={false} />
     </Box>

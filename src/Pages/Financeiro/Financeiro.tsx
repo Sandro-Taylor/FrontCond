@@ -144,9 +144,9 @@ export const Financeiro = () => {
   });
 
   return (
-    <Flex align="flex-start" gap={6} direction={{ base: "column", md: "row" }}>
+    <Flex align="flex-start" gap={{ base: 0, md: 6 }} direction={{ base: "column", md: "row" }}>
       <Titulo />
-      <Box flex={1} minWidth={0} paddingY={6} paddingRight={{ md: 6 }}>
+      <Box flex={1} minWidth={0} paddingY={6} paddingX={{ base: 4, md: 0 }} paddingRight={{ md: 6 }}>
         <Flex justify="space-between" align="flex-start" gap={4} wrap="wrap" marginBottom={6}>
           <Box>
             <Text fontSize="2xl" fontWeight="semibold" color="gray.800">Financeiro</Text>

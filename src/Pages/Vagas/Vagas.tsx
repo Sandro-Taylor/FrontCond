@@ -123,9 +123,9 @@ export const Vagas = () => {
     filtro === "FIXA_OCUPADA" ? fixasOcupadas : filtro === "FIXA_LIVRE" ? fixasLivres : filtro === "ROTATIVA" ? rotativas : vagas;
 
   return (
-    <Flex align="flex-start" gap={6} direction={{ base: "column", md: "row" }}>
+    <Flex align="flex-start" gap={{ base: 0, md: 6 }} direction={{ base: "column", md: "row" }}>
       <Titulo />
-      <Box flex={1} minWidth={0} paddingY={6} paddingRight={{ md: 6 }}>
+      <Box flex={1} minWidth={0} paddingY={6} paddingX={{ base: 4, md: 0 }} paddingRight={{ md: 6 }}>
         <Flex justify="space-between" align="flex-start" gap={4} wrap="wrap" marginBottom={6}>
           <Box>
             <Text fontSize="2xl" fontWeight="semibold" color="gray.800">Vagas</Text>
@@ -206,7 +206,7 @@ export const Vagas = () => {
             <ModalHeader>{editando ? `Editar vaga ${editando.numero}` : "Nova vaga"}</ModalHeader>
             <ModalCloseButton />
             <ModalBody>
-              <SimpleGrid columns={2} spacing={3}>
+              <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={3}>
                 <FormControl isRequired>
                   <FormLabel fontSize="sm">Número</FormLabel>
                   <Input value={formulario.numero} onChange={(e) => setFormulario({ ...formulario, numero: e.target.value })} placeholder="Ex.: 12" autoFocus />

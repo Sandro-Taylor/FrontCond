@@ -23,6 +23,7 @@ export type ApartamentoResumo = {
   andar: number | null;
   observacao: string | null;
   ativo: boolean;
+  fracao_ideal: string | null;   // % no rateio (Fração ideal)
   ocupacao: Ocupacao;
   proprietarios: string[];
   inquilinos: string[];
@@ -84,6 +85,7 @@ export type ApartamentoDetalhe = {
   andar: number | null;
   observacao: string | null;
   ativo: boolean;
+  fracao_ideal: string | null;   // % no rateio (Fração ideal)
   ocupacao: Ocupacao;
   pessoas: VinculoApartamento[];
   vagas: VagaApartamento[];

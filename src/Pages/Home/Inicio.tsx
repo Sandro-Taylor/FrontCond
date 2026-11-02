@@ -16,6 +16,7 @@ import { QuadroAvisos } from "../Avisos/QuadroAvisos";
 import { apiCondominios, type Condominio } from "../Condominios/ConfigCondominios";
 import { CamposContato, contatoDe, paraEnvio, type ValoresContato } from "../Condominios/ModaisCondominio";
 import { IconeCarro, IconeCartao, IconeCasa, IconePredio, IconeUsuario, IconeVaga } from "../Pessoas/IconesPessoas";
+import { FotoPessoa } from "../../Components/Arquivos";
 
 type Resumo = {
   condominio: {
@@ -31,6 +32,15 @@ type Resumo = {
     telefone: string | null;
     email: string | null;
   };
+  gestao: {
+    pessoa_id: string;
+    nome: string;
+    perfil: "SINDICO" | "CONSELHEIRO";
+    unidade: string | null;
+    telefone: string | null; // só do síndico
+    email: string | null;    // só do síndico
+    foto_arquivo_id: string | null;
+  }[];
   total_apartamentos: number;
   total_vagas: number;
   vagas_fixas: number;
@@ -106,10 +116,10 @@ export const Dashboard = () => {
   const linhaCidade = c ? [c.bairro, [c.cidade, c.uf].filter(Boolean).join("/")].filter(Boolean).join(" · ") : "";
 
   return (
-    <Flex align="flex-start" gap={6} direction={{ base: "column", md: "row" }}>
+    <Flex align="flex-start" gap={{ base: 0, md: 6 }} direction={{ base: "column", md: "row" }}>
       <Titulo />
 
-      <Box flex={1} minWidth={0} paddingY={8} paddingRight={{ md: 6 }}>
+      <Box flex={1} minWidth={0} paddingY={8} paddingX={{ base: 4, md: 0 }} paddingRight={{ md: 6 }}>
         <Heading size="md">Olá, {user?.full_name}</Heading>
         <Text color="gray.500" marginTop={1}> Condomínio {condominioAtual ? condominioAtual.nome : "Gerenciamento do condomínio"}</Text>
 
@@ -155,6 +165,34 @@ export const Dashboard = () => {
                       <Informacao icone={EmailIcon}>{c.email ?? <Text as="span" color="gray.400">E-mail não informado</Text>}</Informacao>
                       <Informacao icone={IconeCartao}>{c.cnpj ? `CNPJ ${formatarCnpj(c.cnpj)}` : <Text as="span" color="gray.400">CNPJ não informado</Text>}</Informacao>
                     </Flex>
+                  </Box>
+
+                  {/* GESTÃO: SÍNDICO E CONSELHEIROS */}
+                  <Box bg="white" borderRadius="xl" border="1px solid" borderColor="gray.100" padding={4}>
+                    <Text fontWeight="semibold">Gestão do condomínio</Text>
+                    <Divider marginY={2} />
+                    {resumo.gestao.length === 0 ? (
+                      <Text fontSize="sm" color="gray.400">Síndico e conselheiros ainda não designados.</Text>
+                    ) : (
+                      <Flex direction="column" gap={3}>
+                        {resumo.gestao.map((m) => (
+                          <Flex key={m.pessoa_id} align="center" gap={3}>
+                            <FotoPessoa nome={m.nome} fotoId={m.foto_arquivo_id} tamanho="sm" />
+                            <Box minWidth={0}>
+                              <Text fontSize="sm" fontWeight="medium" color="gray.800">
+                                {m.nome}
+                                <Text as="span" fontSize="xs" fontWeight="normal" color={m.perfil === "SINDICO" ? "blue.600" : "gray.500"}>
+                                  {" · "}{m.perfil === "SINDICO" ? "Síndico" : "Conselheiro"}{m.unidade && ` · ${m.unidade}`}
+                                </Text>
+                              </Text>
+                              {(m.telefone || m.email) && (
+                                <Text fontSize="xs" color="gray.500">{[m.telefone && formatarTelefone(m.telefone), m.email].filter(Boolean).join(" · ")}</Text>
+                              )}
+                            </Box>
+                          </Flex>
+                        ))}
+                      </Flex>
+                    )}
                   </Box>
 
                   <SimpleGrid columns={2} spacing={2}>

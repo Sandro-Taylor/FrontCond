@@ -20,6 +20,7 @@ import { useAuth } from "../Login/useAuth";
 import { Titulo } from "../Titulos/Titulos";
 import { apiCondominios, type Condominio, type CondominioPainel } from "./ConfigCondominios";
 import { ModalCondominio, ModalSindico } from "./ModaisCondominio";
+import { ModalConselheiros } from "./ModalConselheiros";
 
 const Indicador = ({ rotulo, valor, cor }: { rotulo: string; valor: number; cor?: string }) => (
   <Box bg="white" paddingX={5} paddingY={4}>
@@ -41,6 +42,7 @@ export const Condominios = () => {
   const { user, recarregarUsuario, trocarCondominio } = useAuth();
   const modalCondominio = useDisclosure();
   const modalSindico = useDisclosure();
+  const modalConselheiros = useDisclosure();
 
   const [itens, setItens] = useState<CondominioPainel[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -60,6 +62,7 @@ export const Condominios = () => {
   function novo() { setEditando(null); modalCondominio.onOpen(); }
   function editar(c: Condominio) { setEditando(c); modalCondominio.onOpen(); }
   function sindico(item: CondominioPainel) { setItemSindico(item); modalSindico.onOpen(); }
+  function conselheiros(item: CondominioPainel) { setItemSindico(item); modalConselheiros.onOpen(); }
 
   async function aoSalvo(salvo: Condominio, eraNovo: boolean) {
     modalCondominio.onClose();
@@ -93,7 +96,7 @@ export const Condominios = () => {
 
   if (!user?.admin_sistema) {
     return (
-      <Flex align="flex-start" gap={6} direction={{ base: "column", md: "row" }}>
+      <Flex align="flex-start" gap={{ base: 0, md: 6 }} direction={{ base: "column", md: "row" }}>
         <Titulo />
         <Text padding={10} color="gray.500">Apenas o administrador do sistema acessa o painel de condomínios.</Text>
       </Flex>
@@ -110,9 +113,9 @@ export const Condominios = () => {
   });
 
   return (
-    <Flex align="flex-start" gap={6} direction={{ base: "column", md: "row" }}>
+    <Flex align="flex-start" gap={{ base: 0, md: 6 }} direction={{ base: "column", md: "row" }}>
       <Titulo />
-      <Box flex={1} minWidth={0} paddingY={6} paddingRight={{ md: 6 }}>
+      <Box flex={1} minWidth={0} paddingY={6} paddingX={{ base: 4, md: 0 }} paddingRight={{ md: 6 }}>
         <Flex justify="space-between" align="flex-start" gap={4} wrap="wrap" marginBottom={6}>
           <Box>
             <Text fontSize="2xl" fontWeight="semibold" color="gray.800">Painel do sistema</Text>
@@ -171,6 +174,7 @@ export const Condominios = () => {
                       <MenuList fontSize="sm">
                         <MenuItem onClick={() => editar(c)}>Editar dados</MenuItem>
                         <MenuItem onClick={() => sindico(item)}>{item.sindicos.length ? "Trocar síndico" : "Designar síndico"}</MenuItem>
+                        <MenuItem onClick={() => conselheiros(item)}>Definir conselheiros</MenuItem>
                         <MenuItem color={c.ativo ? "red.600" : undefined} onClick={() => alternarAtivo(c)}>{c.ativo ? "Arquivar" : "Restaurar"}</MenuItem>
                       </MenuList>
                     </Menu>
@@ -190,6 +194,16 @@ export const Condominios = () => {
                         {c.ativo && <Button size="xs" colorScheme="orange" onClick={() => sindico(item)}>Designar</Button>}
                       </Flex>
                     )}
+                  </Box>
+
+                  <Box bg="gray.50" borderRadius="lg" paddingX={3} paddingY={2}>
+                    <Flex justify="space-between" align="center" gap={2}>
+                      <Text fontSize="2xs" color="gray.500">Conselheiros</Text>
+                      {c.ativo && <Button size="xs" variant="link" colorScheme="blue" onClick={() => conselheiros(item)}>{item.conselheiros.length ? "Alterar" : "Definir"}</Button>}
+                    </Flex>
+                    {item.conselheiros.length ? (
+                      <Text fontSize="sm" noOfLines={2}>{item.conselheiros.map((p) => p.nome).join(", ")}</Text>
+                    ) : <Text fontSize="sm" color="gray.400">Nenhum conselheiro</Text>}
                   </Box>
 
                   <SimpleGrid columns={3} spacing={2}>
@@ -212,6 +226,7 @@ export const Condominios = () => {
         )}
 
         <ModalCondominio aberto={modalCondominio.isOpen} aoFechar={modalCondominio.onClose} condominio={editando} aoSalvo={aoSalvo} />
+        <ModalConselheiros aberto={modalConselheiros.isOpen} aoFechar={modalConselheiros.onClose} item={itemSindico} aoSalvo={carregar} />
         <ModalSindico aberto={modalSindico.isOpen} aoFechar={modalSindico.onClose} item={itemSindico} aoDesignado={carregar} />
       </Box>
     </Flex>

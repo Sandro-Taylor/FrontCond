@@ -2,7 +2,8 @@
 // USUÁRIOS DO SISTEMA (somente ADM)
 // ---------------------------------------------------------
 // Todos os logins, com os condomínios e o perfil em cada um.
-// Ações: bloquear/desbloquear e gerar nova senha temporária.
+// Ações: bloquear/desbloquear, gerar nova senha temporária e
+// marcar o RESPONSÁVEL (recebe as mensagens do WhatsApp).
 // O acesso a um condomínio é dado em Pessoas (ou ao designar
 // o síndico no painel).
 // ---------------------------------------------------------
@@ -26,6 +27,7 @@ type Usuario = {
   email: string;
   status: "ativo" | "inativo" | "bloqueado";
   admin_sistema: boolean;
+  responsavel: boolean;
   trocar_senha: boolean;
   created_at: string;
   condominios: { condominio_id: string; condominio_nome: string; perfil: PerfilPessoa; ativo: boolean }[];
@@ -34,6 +36,7 @@ type Usuario = {
 const api = {
   listar: () => chamarApi<Usuario[]>("/users/", "GET", "Não foi possível carregar os usuários."),
   status: (id: string, status: "ativo" | "bloqueado") => chamarApi<void>(`/users/${id}/status`, "PATCH", "Não foi possível alterar o usuário.", { status }),
+  responsavel: (id: string, responsavel: boolean) => chamarApi<void>(`/users/${id}/responsavel`, "PATCH", "Não foi possível alterar o usuário.", { responsavel }),
   novaSenha: (id: string) => chamarApi<{ email: string; senha_temporaria: string }>(`/users/${id}/nova-senha`, "POST", "Não foi possível gerar a senha."),
 };
 
@@ -68,6 +71,16 @@ export const Usuarios = () => {
     } catch (e) { toast({ title: e instanceof Error ? e.message : "Erro ao alterar o usuário", status: "error" }); }
   }
 
+  async function alternarResponsavel(u: Usuario) {
+    const marcar = !u.responsavel;
+    if (!marcar && !window.confirm(`${u.full_name} deixará de receber as mensagens do WhatsApp. Continuar?`)) return;
+    try {
+      await api.responsavel(u.id, marcar);
+      toast({ title: marcar ? `${u.full_name} agora é responsável pelo WhatsApp` : "Responsável removido", status: "success", duration: 2500 });
+      await carregar();
+    } catch (e) { toast({ title: e instanceof Error ? e.message : "Erro ao alterar o usuário", status: "error" }); }
+  }
+
   async function gerarSenha(u: Usuario) {
     if (!window.confirm(`Gerar uma nova senha para ${u.full_name}? A senha atual deixa de funcionar.`)) return;
     try {
@@ -79,7 +92,7 @@ export const Usuarios = () => {
 
   if (!user?.admin_sistema) {
     return (
-      <Flex align="flex-start" gap={6} direction={{ base: "column", md: "row" }}>
+      <Flex align="flex-start" gap={{ base: 0, md: 6 }} direction={{ base: "column", md: "row" }}>
         <Titulo />
         <Text padding={10} color="gray.500">Apenas o administrador do sistema acessa os usuários.</Text>
       </Flex>
@@ -91,17 +104,18 @@ export const Usuarios = () => {
   const termo = busca.trim().toLowerCase();
   const filtrados = usuarios.filter((u) => {
     if (filtro === "ADM" && !u.admin_sistema) return false;
+    if (filtro === "RESPONSAVEIS" && !u.responsavel) return false;
     if (filtro === "BLOQUEADOS" && u.status === "ativo") return false;
     if (filtro === "SEM_CONDOMINIO" && (u.admin_sistema || u.condominios.length > 0)) return false;
-    if (filtro && !["ADM", "BLOQUEADOS", "SEM_CONDOMINIO"].includes(filtro) && !u.condominios.some((c) => c.condominio_id === filtro)) return false;
+    if (filtro && !["ADM", "RESPONSAVEIS", "BLOQUEADOS", "SEM_CONDOMINIO"].includes(filtro) && !u.condominios.some((c) => c.condominio_id === filtro)) return false;
     if (!termo) return true;
     return [u.full_name, u.email, ...u.condominios.map((c) => c.condominio_nome)].some((t) => t.toLowerCase().includes(termo));
   });
 
   return (
-    <Flex align="flex-start" gap={6} direction={{ base: "column", md: "row" }}>
+    <Flex align="flex-start" gap={{ base: 0, md: 6 }} direction={{ base: "column", md: "row" }}>
       <Titulo />
-      <Box flex={1} minWidth={0} paddingY={6} paddingRight={{ md: 6 }}>
+      <Box flex={1} minWidth={0} paddingY={6} paddingX={{ base: 4, md: 0 }} paddingRight={{ md: 6 }}>
         <Box marginBottom={6}>
           <Text fontSize="2xl" fontWeight="semibold" color="gray.800">Usuários do sistema</Text>
           <Text fontSize="sm" color="gray.500" marginTop={1}>{usuarios.length} login(s). O acesso a um condomínio é dado em Pessoas ou ao designar o síndico.</Text>
@@ -115,6 +129,7 @@ export const Usuarios = () => {
           <Select maxWidth={{ md: "260px" }} bg="white" borderRadius="lg" value={filtro} onChange={(e) => setFiltro(e.target.value)}>
             <option value="">Todos os usuários</option>
             <option value="ADM">Administradores do sistema</option>
+            <option value="RESPONSAVEIS">Responsáveis (WhatsApp)</option>
             <option value="BLOQUEADOS">Bloqueados</option>
             <option value="SEM_CONDOMINIO">Sem condomínio</option>
             {nomesCondominios.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
@@ -143,6 +158,7 @@ export const Usuarios = () => {
                         <Flex align="center" gap={2}>
                           <Text fontWeight="medium">{u.full_name}</Text>
                           {u.admin_sistema && <Badge colorScheme="purple" textTransform="none">ADM do sistema</Badge>}
+                          {u.responsavel && <Badge colorScheme="green" textTransform="none">Responsável WhatsApp</Badge>}
                         </Flex>
                         <Text fontSize="xs" color="gray.500">{u.email}</Text>
                       </Td>
@@ -163,6 +179,9 @@ export const Usuarios = () => {
                       <Td fontSize="sm">{formatarData(u.created_at)}</Td>
                       <Td>
                         <Flex gap={2} justify="flex-end">
+                          <Button size="xs" variant="outline" colorScheme={u.responsavel ? "gray" : "green"} onClick={() => alternarResponsavel(u)}>
+                            {u.responsavel ? "Remover responsável" : "Tornar responsável"}
+                          </Button>
                           <Button size="xs" variant="outline" onClick={() => gerarSenha(u)}>Nova senha</Button>
                           {u.id !== user.id && (
                             <Button size="xs" variant="ghost" colorScheme={u.status === "ativo" ? "red" : "green"} onClick={() => alternarBloqueio(u)}>

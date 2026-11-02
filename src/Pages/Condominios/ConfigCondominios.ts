@@ -29,6 +29,7 @@ export type SindicoResumo = { pessoa_id: string; nome: string; email: string | n
 export type CondominioPainel = {
   condominio: Condominio;
   sindicos: SindicoResumo[];
+  conselheiros: SindicoResumo[];
   total_apartamentos: number;
   total_pessoas: number;
   total_usuarios: number;
@@ -64,6 +65,8 @@ export const apiCondominios = {
   restaurar: (id: string) => chamarApi<Condominio>(`/condominios/${id}/restaurar`, "PATCH", "Não foi possível restaurar o condomínio."),
   designarSindico: (id: string, dados: DesignarSindico) =>
     chamarApi<SindicoDesignado>(`/condominios/${id}/sindico`, "POST", "Não foi possível designar o síndico.", dados),
+  definirConselheiros: (id: string, pessoaIds: string[]) =>
+    chamarApi<SindicoResumo[]>(`/condominios/${id}/conselheiros`, "PUT", "Não foi possível salvar os conselheiros.", { pessoa_ids: pessoaIds }),
   editarContato: (dados: ContatoCondominio) => chamarApi<Condominio>("/condominios/atual/contato", "PUT", "Não foi possível salvar os dados do condomínio.", dados),
 
   // lista as pessoas de outro condomínio (o cabeçalho X-Condominio-Id é o do condomínio escolhido)

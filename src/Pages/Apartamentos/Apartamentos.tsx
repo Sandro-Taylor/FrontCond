@@ -6,6 +6,7 @@
 // são geridos no modal de detalhe.
 // ---------------------------------------------------------
 
+import { formatarFracao } from "../FracaoIdeal/FracaoIdeal";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ElementType } from "react";
@@ -109,9 +110,9 @@ export const Apartamentos = () => {
   const contar = (ocupacao: Ocupacao) => apartamentos.filter((a) => a.ocupacao === ocupacao).length;
 
   return (
-    <Flex align="flex-start" gap={6} direction={{ base: "column", md: "row" }}>
+    <Flex align="flex-start" gap={{ base: 0, md: 6 }} direction={{ base: "column", md: "row" }}>
       <Titulo />
-      <Box flex={1} minWidth={0} paddingY={6} paddingRight={{ md: 6 }}>
+      <Box flex={1} minWidth={0} paddingY={6} paddingX={{ base: 4, md: 0 }} paddingRight={{ md: 6 }}>
         <Flex justify="space-between" align="flex-start" gap={4} wrap="wrap" marginBottom={6}>
           <Box>
             <Text fontSize="2xl" fontWeight="semibold" color="gray.800">Apartamentos</Text>
@@ -167,7 +168,10 @@ export const Apartamentos = () => {
                   <Flex justify="space-between" align="center" padding={5} gap={3}>
                     <Box>
                       <Text fontWeight="semibold" fontSize="lg" color="gray.800">{rotuloApartamento(apartamento)}</Text>
-                      <Text fontSize="xs" color="gray.500">{apartamento.andar !== null ? `${apartamento.andar}º andar` : "Andar não informado"}</Text>
+                      <Text fontSize="xs" color="gray.500">
+                        {apartamento.andar !== null ? `${apartamento.andar}º andar` : "Andar não informado"}
+                        {apartamento.fracao_ideal != null && ` · Fração ${formatarFracao(apartamento.fracao_ideal)}%`}
+                      </Text>
                     </Box>
                     <Badge colorScheme={ocupacao.cor} borderRadius="full" paddingX={2.5} textTransform="none">{ocupacao.rotulo}</Badge>
                   </Flex>
@@ -201,7 +205,7 @@ export const Apartamentos = () => {
             <ModalHeader>Novo apartamento</ModalHeader>
             <ModalCloseButton />
             <ModalBody>
-              <SimpleGrid columns={3} spacing={3}>
+              <SimpleGrid columns={{ base: 1, sm: 3 }} spacing={3}>
                 <FormControl>
                   <FormLabel fontSize="sm">Bloco</FormLabel>
                   <Input value={formulario.bloco} onChange={(e) => setFormulario({ ...formulario, bloco: e.target.value })} placeholder="Ex.: A" />

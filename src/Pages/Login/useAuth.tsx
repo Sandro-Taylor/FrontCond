@@ -22,6 +22,7 @@ type User = {
   email: string;
   status: string;
   admin_sistema: boolean;
+  responsavel: boolean; // recebe e responde as mensagens do WhatsApp
   trocar_senha: boolean; // senha temporária: troca obrigatória antes de usar o sistema
   created_at: string;
   condominios: CondominioDoUsuario[];

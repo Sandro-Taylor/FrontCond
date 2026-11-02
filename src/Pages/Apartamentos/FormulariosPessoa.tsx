@@ -15,6 +15,8 @@ import { SearchIcon } from "@chakra-ui/icons";
 
 import { formatarCpf, formatarTelefone } from "../../Components/config";
 import { CamposPessoa, PESSOA_VAZIA, paraPessoaDados, validarPessoa, type ValoresPessoa } from "../Pessoas/CamposPessoa";
+import { CampoResponsavel, useOpcoesResponsavel } from "../Pessoas/CampoResponsavel";
+import { useAuth } from "../Login/useAuth";
 import {
   ROTULOS_PARENTESCO, ROTULOS_TIPO_RELACAO, type Parentesco, type PessoaDados, type TipoRelacao,
 } from "../Pessoas/ConfigPessoas";
@@ -120,6 +122,9 @@ export function ModalAdicionarPessoa({ aberto, aoFechar, titulares, aoAdicionar 
   const [naoEncontrada, setNaoEncontrada] = useState(false);
   const [valores, setValores] = useState<ValoresPessoa>(PESSOA_VAZIA);
   const [salvando, setSalvando] = useState(false);
+  const editaTudo = Boolean(useAuth().user?.admin_sistema); // o responsável do WhatsApp: só o ADM escolhe
+  const [responsavel, setResponsavel] = useState<string | null>(null);
+  const opcoesResponsavel = useOpcoesResponsavel(aberto && editaTudo);
 
   // a cada abertura, começa limpo (sem titular: proprietário; com titular: residente)
   useEffect(() => {
@@ -130,6 +135,7 @@ export function ModalAdicionarPessoa({ aberto, aoFechar, titulares, aoAdicionar 
     setEncontrada(null);
     setNaoEncontrada(false);
     setValores(PESSOA_VAZIA);
+    setResponsavel(null);
   }, [aberto]);
 
   async function buscar() {
@@ -169,7 +175,7 @@ export function ModalAdicionarPessoa({ aberto, aoFechar, titulares, aoAdicionar 
         toast({ title: erro, status: "warning" });
         return;
       }
-      dados = { ...dadosVinculo, pessoa: paraPessoaDados(valores) };
+      dados = { ...dadosVinculo, pessoa: { ...paraPessoaDados(valores), ...(editaTudo ? { responsavel_user_id: responsavel } : {}) } };
     }
 
     setSalvando(true);
@@ -219,7 +225,14 @@ export function ModalAdicionarPessoa({ aberto, aoFechar, titulares, aoAdicionar 
               <Text fontSize="xs" color="gray.500" marginTop={3}>Para crianças ou pessoas sem CPF, use "Pessoa nova".</Text>
             </Box>
           ) : (
-            <CamposPessoa valores={valores} aoMudar={setValores} tamanho="sm" />
+            <Box>
+              <CamposPessoa valores={valores} aoMudar={setValores} tamanho="sm" />
+              {editaTudo && (
+                <Box marginTop={3}>
+                  <CampoResponsavel valor={responsavel} aoMudar={setResponsavel} opcoes={opcoesResponsavel} tamanho="sm" />
+                </Box>
+              )}
+            </Box>
           )}
         </ModalBody>
         <ModalFooter gap={3}>

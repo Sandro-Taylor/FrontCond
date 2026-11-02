@@ -11,6 +11,7 @@ import { Box, Button, Divider, Flex, FormControl, FormLabel, Select, Text, useTo
 import { CamposPessoa, PESSOA_VAZIA, paraPessoaDados, validarPessoa, type ValoresPessoa } from "./CamposPessoa";
 import { CamposFuncionario, FICHA_VAZIA, paraFichaDados, validarFicha, type ValoresFicha } from "./CamposFuncionario";
 import { useAuth } from "../Login/useAuth";
+import { CampoResponsavel, useOpcoesResponsavel } from "./CampoResponsavel";
 import { PERFIS_SO_ADM, ROTULOS_PERFIL, type Cargo, type PerfilPessoa, type PessoaCriarDados } from "./ConfigPessoas";
 
 type CriarPessoaProps = {
@@ -25,8 +26,10 @@ export function CriarPessoa({ aoCriar, criando, criar, cargos }: CriarPessoaProp
   const [valores, setValores] = useState<ValoresPessoa>(PESSOA_VAZIA);
   const [perfil, setPerfil] = useState<PerfilPessoa>("MORADOR");
   const [ficha, setFicha] = useState<ValoresFicha>(FICHA_VAZIA);
-  const funcionario = perfil === "FUNCIONARIO";
   const { user } = useAuth();
+  const [responsavel, setResponsavel] = useState<string | null>(null); // vazio = síndico do prédio; só o ADM escolhe
+  const opcoesResponsavel = useOpcoesResponsavel(Boolean(user?.admin_sistema));
+  const funcionario = perfil === "FUNCIONARIO";
   // síndico e conselheiro: só o ADM do sistema designa
   const perfis = (Object.keys(ROTULOS_PERFIL) as PerfilPessoa[]).filter((p) => user?.admin_sistema || !PERFIS_SO_ADM.includes(p));
 
@@ -36,7 +39,7 @@ export function CriarPessoa({ aoCriar, criando, criar, cargos }: CriarPessoaProp
       toast({ title: erro, status: "warning" });
       return;
     }
-    const dados: PessoaCriarDados = { ...paraPessoaDados(valores), perfil, funcionario: funcionario ? paraFichaDados(ficha) : null };
+    const dados: PessoaCriarDados = { ...paraPessoaDados(valores), ...(user?.admin_sistema ? { responsavel_user_id: responsavel } : {}), perfil, funcionario: funcionario ? paraFichaDados(ficha) : null };
     if (await criar(dados)) aoCriar();
   }
 
@@ -52,6 +55,8 @@ export function CriarPessoa({ aoCriar, criando, criar, cargos }: CriarPessoaProp
           ))}
         </Select>
       </FormControl>
+
+      {user?.admin_sistema && <CampoResponsavel valor={responsavel} aoMudar={setResponsavel} opcoes={opcoesResponsavel} />}
 
       {funcionario && (
         <Box>

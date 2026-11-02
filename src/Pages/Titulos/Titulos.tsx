@@ -1,9 +1,10 @@
 import { useAuth } from "../Login/useAuth";
 import { ROTULOS_PERFIL, type PerfilPessoa } from "../Pessoas/ConfigPessoas";
 import { usePermissoes } from "../../Components/permissoes";
-import {Badge,Box,Button,Flex,Heading,Icon,Select,Text,VStack} from "@chakra-ui/react";
+import {Badge,Box,Button,Collapse,Drawer,DrawerBody,DrawerCloseButton,DrawerContent,DrawerHeader,DrawerOverlay,Flex,Heading,Icon,IconButton,Select,Text,Tooltip,VStack,useDisclosure} from "@chakra-ui/react";
+import { useEffect, useState, type ElementType, type ReactNode } from "react";
 import {Link as RouterLink,useLocation,useNavigate} from "react-router-dom";
-import {Car,LayoutDashboard,UserCog,CarFront,DoorOpen,Home,KeyRound,ListChecks,LogOut,Megaphone,MessageSquare,Users,Wallet} from "lucide-react";
+import {Building2,Car,Landmark,ChartPie,Wrench,Handshake,ChevronDown,ClipboardList,Settings,HardDrive,LayoutDashboard,UserCog,CarFront,DoorOpen,Home,KeyRound,ListChecks,LogOut,Megaphone,Menu as MenuIcon,MessageCircle,MessageSquare,Users,Wallet} from "lucide-react";
 
 export const ROTAS = {
   INICIO: "/",
@@ -19,6 +20,13 @@ export const ROTAS = {
   ATENDIMENTO: "/Atendimento",
   TAREFAS: "/Tarefas",
   TROCAR_SENHA: "/TrocarSenha",
+  WHATSAPP: "/WhatsApp",
+  ADMINISTRACAO: "/Administracao",
+  DRIVE: "/Drive",
+  MOVIMENTACOES: "/Movimentacoes",
+  FRACAO_IDEAL: "/FracaoIdeal",
+  MANUTENCOES: "/Manutencoes",
+  PRESTADORES: "/Prestadores",
 } as const;
 
 const DadosTitulos = {
@@ -34,6 +42,61 @@ const DadosTitulos = {
   [ROTAS.ATENDIMENTO]: {titulo: "Atendimento",descricao: "Conversas com a administração.",},
   [ROTAS.TAREFAS]: {titulo: "Tarefas",descricao: "Tarefas da administração e responsáveis.",},
   [ROTAS.TROCAR_SENHA]: {titulo: "Minha conta",descricao: "Troca de senha.",},
+  [ROTAS.MOVIMENTACOES]: {titulo: "Conta bancária",descricao: "Extrato, investimentos, fluxo de caixa e previsão.",},
+  [ROTAS.FRACAO_IDEAL]: {titulo: "Fração ideal",descricao: "Participação de cada unidade no rateio.",},
+  [ROTAS.MANUTENCOES]: {titulo: "Manutenções",descricao: "Vencimentos de manutenções e renovações.",},
+  [ROTAS.PRESTADORES]: {titulo: "Prestadores",descricao: "Funcionários, fornecedores e prestadores.",},
+  [ROTAS.DRIVE]: {titulo: "Arquivos",descricao: "Arquivos do sistema no Google Drive.",},
+  [ROTAS.ADMINISTRACAO]: {titulo: "Administração geral",descricao: "Síndicos, moradores e responsáveis.",},
+  [ROTAS.WHATSAPP]: {titulo: "WhatsApp",descricao: "Mensagens recebidas no número do sistema.",},
+};
+
+// ITEM DO MENU (destaca a página atual)
+const ItemMenu = ({ para, icone, children }: { para: string; icone: ElementType; children: ReactNode }) => {
+  const { pathname } = useLocation();
+  const ativo = para === ROTAS.INICIO ? pathname === para : pathname.toLowerCase().startsWith(para.toLowerCase());
+  return (
+    <Button as={RouterLink} to={para} variant={ativo ? "solid" : "ghost"} colorScheme={ativo ? "blue" : undefined} bg={ativo ? "blue.50" : undefined}
+      color={ativo ? "blue.700" : undefined} size="sm" justifyContent="flex-start" leftIcon={<Icon as={icone} boxSize={4} />} fontWeight={ativo ? "semibold" : "medium"}>
+      {children}
+    </Button>
+  );
+};
+
+// TÓPICO DO MENU: abre e fecha como leque; abre sozinho se a página atual está nele
+const CHAVE_MENU = "menu_topicos_abertos";
+
+function lerAbertos(): Record<string, boolean> {
+  try { return JSON.parse(localStorage.getItem(CHAVE_MENU) ?? "{}"); } catch { return {}; }
+}
+
+const Grupo = ({ id, titulo, icone, rotas, children }: { id: string; titulo: string; icone: ElementType; rotas: string[]; children: ReactNode }) => {
+  const { pathname } = useLocation();
+  const contemAtual = rotas.some((r) => pathname.toLowerCase().startsWith(r.toLowerCase()));
+  const [aberto, setAberto] = useState<boolean>(() => lerAbertos()[id] ?? contemAtual);
+
+  useEffect(() => { if (contemAtual) setAberto(true); }, [contemAtual]);
+
+  function alternar() {
+    const novo = !aberto;
+    setAberto(novo);
+    try { localStorage.setItem(CHAVE_MENU, JSON.stringify({ ...lerAbertos(), [id]: novo })); } catch { /* sem localStorage */ }
+  }
+
+  return (
+    <Box>
+      <Button variant="ghost" size="sm" width="100%" justifyContent="space-between" onClick={alternar} aria-expanded={aberto}
+        color={contemAtual ? "blue.700" : "gray.700"} fontWeight="semibold"
+        leftIcon={<Icon as={icone} boxSize={4} />} rightIcon={<Icon as={ChevronDown} boxSize={4} transition="transform 0.2s" transform={aberto ? "rotate(180deg)" : undefined} />}>
+        <Text as="span" flex={1} textAlign="left">{titulo}</Text>
+      </Button>
+      <Collapse in={aberto} animateOpacity>
+        <VStack align="stretch" spacing={1} paddingLeft={4} marginLeft={3} marginTop={1} borderLeft="1px solid" borderColor="gray.100">
+          {children}
+        </VStack>
+      </Collapse>
+    </Box>
+  );
 };
 
 export const Titulo = () => {
@@ -41,6 +104,8 @@ export const Titulo = () => {
   const navigate = useNavigate();
   const { user, logout, condominioAtual, trocarCondominio } = useAuth();
   const permissoes = usePermissoes();
+  const menuCelular = useDisclosure();
+  useEffect(() => { menuCelular.onClose(); }, [pathname]); // fecha a gaveta ao trocar de página
   // página exata ou subpágina (ex.: /Apartamentos/123 usa o título de /Apartamentos)
   const chave = (Object.keys(DadosTitulos) as (keyof typeof DadosTitulos)[])
     .filter((rota) => rota !== ROTAS.INICIO)
@@ -50,18 +115,23 @@ export const Titulo = () => {
   if (!pagina) return null;
   function sair() {logout(); navigate(ROTAS.LOGIN)}
 
-  return (
-    <Flex as="aside"direction="column"width={{ base: "full", md: "260px" }}minWidth={{ md: "260px" }}height={{ md: "100vh" }}position={{ md: "sticky" }}top={{ md: 0 }}padding={5}gap={6}
-      borderRadius={{ base: "2xl", md: 0 }}bg="white"border="1px solid"borderColor="gray.100"boxShadow="sm">
-      <Box>
-        <VStack>
-          <Heading size="md" color="gray.800">{pagina.titulo}</Heading>
-          <Text marginTop={1} color="gray.500" fontSize="sm">Olá, {user?.full_name}</Text>
-          <Text color="gray.500" fontSize="sm">{pagina.descricao}</Text>
-        </VStack>
-      </Box>
+  const ehAdm = Boolean(user?.admin_sistema);
+  const veWhatsApp = ehAdm || Boolean(user?.responsavel) || Boolean(user?.condominios.some((c) => c.perfil === "SINDICO"));
 
-      {/* CONDOMÍNIO ATUAL */}
+  const icones = (
+    <Flex gap={1} flexShrink={0}>
+      <Tooltip label="Trocar senha">
+        <IconButton as={RouterLink} to={ROTAS.TROCAR_SENHA} aria-label="Trocar senha" size="sm" variant="ghost" icon={<Icon as={KeyRound} boxSize={4} />} />
+      </Tooltip>
+      <Tooltip label="Sair">
+        <IconButton aria-label="Sair" size="sm" variant="ghost" colorScheme="red" onClick={sair} icon={<Icon as={LogOut} boxSize={4} />} />
+      </Tooltip>
+    </Flex>
+  );
+
+  // condomínio atual + as 3 seções do menu (usado no desktop e na gaveta do celular)
+  const conteudo = (
+    <>
       {user && user.condominios.length > 0 && (
         <Box>
           <Text fontSize="xs" color="gray.500" marginBottom={1}>Condomínio</Text>
@@ -78,61 +148,85 @@ export const Titulo = () => {
         </Box>
       )}
 
-      <VStack as="nav"align="stretch"spacing={1}flex={1}>
-        {user?.admin_sistema && (
-          <>
-            <Text fontSize="2xs" fontWeight="bold" color="gray.400" textTransform="uppercase" letterSpacing="wider" paddingX={3}>Administração do sistema</Text>
-            <Button as={RouterLink}to={ROTAS.CONDOMINIOS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-              <Icon as={LayoutDashboard}boxSize={4}/>}>Painel e condomínios</Button>
-            <Button as={RouterLink}to={ROTAS.USUARIOS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-              <Icon as={UserCog}boxSize={4}/>}>Usuários</Button>
-            {condominioAtual && (
-              <Text fontSize="2xs" fontWeight="bold" color="gray.400" textTransform="uppercase" letterSpacing="wider" paddingX={3} paddingTop={3}>
-                {condominioAtual.nome}
-              </Text>
-            )}
-          </>
+      <VStack as="nav" align="stretch" spacing={1} flex={1}>
+        {(condominioAtual || ehAdm) && <ItemMenu para={ROTAS.INICIO} icone={Home}>Início</ItemMenu>}
+
+        {/* ADMINISTRAÇÃO DO SISTEMA (só ADM) */}
+        {ehAdm && (
+          <Grupo id="sistema" titulo="Sistema" icone={Settings} rotas={[ROTAS.CONDOMINIOS, ROTAS.ADMINISTRACAO, ROTAS.USUARIOS]}>
+            <ItemMenu para={ROTAS.CONDOMINIOS} icone={LayoutDashboard}>Painel e condomínios</ItemMenu>
+            <ItemMenu para={ROTAS.ADMINISTRACAO} icone={ClipboardList}>Administração geral</ItemMenu>
+            <ItemMenu para={ROTAS.USUARIOS} icone={UserCog}>Usuários</ItemMenu>
+          </Grupo>
         )}
-        <Button as={RouterLink}to={ROTAS.INICIO}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-          <Icon as={Home}boxSize={4}/>}>Início</Button>
-        {condominioAtual && (
-          <Button as={RouterLink}to={ROTAS.AVISOS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-            <Icon as={Megaphone}boxSize={4}/>}>Avisos</Button>
+
+        {/* ADMINISTRAÇÃO DO CONDOMÍNIO */}
+        {(condominioAtual || veWhatsApp) && (
+          <Grupo id="administracao" titulo={permissoes.editaTudo || veWhatsApp ? "Condomínio" : "Condomínio"} icone={Building2}
+            rotas={[ROTAS.AVISOS, ROTAS.ATENDIMENTO, ROTAS.TAREFAS, ROTAS.FINANCEIRO, ROTAS.MOVIMENTACOES, ROTAS.FRACAO_IDEAL, ROTAS.WHATSAPP, ROTAS.MANUTENCOES, ROTAS.PRESTADORES, ROTAS.DRIVE]}>
+            {condominioAtual && <ItemMenu para={ROTAS.AVISOS} icone={Megaphone}>Avisos</ItemMenu>}
+            {condominioAtual && <ItemMenu para={ROTAS.ATENDIMENTO} icone={MessageSquare}>{permissoes.editaTudo ? "Atendimento" : "Fale com o síndico"}</ItemMenu>}
+            {permissoes.acessaTarefas && <ItemMenu para={ROTAS.TAREFAS} icone={ListChecks}>Tarefas</ItemMenu>}
+            {permissoes.acessaFinanceiro && <ItemMenu para={ROTAS.FINANCEIRO} icone={Wallet}>Financeiro</ItemMenu>}
+            {permissoes.veFinanceiroTudo && <ItemMenu para={ROTAS.MOVIMENTACOES} icone={Landmark}>Conta bancária</ItemMenu>}
+            {permissoes.veFinanceiroTudo && <ItemMenu para={ROTAS.FRACAO_IDEAL} icone={ChartPie}>Fração ideal</ItemMenu>}
+            {veWhatsApp && <ItemMenu para={ROTAS.WHATSAPP} icone={MessageCircle}>WhatsApp</ItemMenu>}
+            {condominioAtual && permissoes.veTudo && <ItemMenu para={ROTAS.MANUTENCOES} icone={Wrench}>Manutenções</ItemMenu>}
+            {condominioAtual && permissoes.veFinanceiroTudo && <ItemMenu para={ROTAS.PRESTADORES} icone={Handshake}>Prestadores</ItemMenu>}
+            {(ehAdm || permissoes.editaTudo) && <ItemMenu para={ROTAS.DRIVE} icone={HardDrive}>Arquivos (Drive)</ItemMenu>}
+          </Grupo>
         )}
-        {condominioAtual && (
-          <Button as={RouterLink}to={ROTAS.ATENDIMENTO}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-            <Icon as={MessageSquare}boxSize={4}/>}>{permissoes.editaTudo ? "Atendimento" : "Fale com o síndico"}</Button>
-        )}
-        {permissoes.acessaCadastros && (
-          <Button as={RouterLink}to={ROTAS.APARTAMENTOS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-            <Icon as={DoorOpen}boxSize={4}/>}>Apartamentos</Button>
-        )}
-        {permissoes.veTudo && (
-          <Button as={RouterLink}to={ROTAS.VAGAS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-            <Icon as={CarFront}boxSize={4}/>}>Vagas</Button>
-        )}
-        {permissoes.acessaCadastros && (
-          <Button as={RouterLink}to={ROTAS.VEICULOS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-            <Icon as={Car}boxSize={4}/>}>Veículos</Button>
-        )}
-        {permissoes.acessaCadastros && (
-          <Button as={RouterLink}to={ROTAS.PESSOA}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-            <Icon as={Users}boxSize={4}/>}>Pessoas</Button>
-        )}
-        {permissoes.acessaTarefas && (
-          <Button as={RouterLink}to={ROTAS.TAREFAS}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-            <Icon as={ListChecks}boxSize={4}/>}>Tarefas</Button>
-        )}
-        {permissoes.acessaFinanceiro && (
-          <Button as={RouterLink}to={ROTAS.FINANCEIRO}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-            <Icon as={Wallet}boxSize={4}/>}>Financeiro</Button>
+
+        {/* MORADORES */}
+        {(permissoes.acessaCadastros || permissoes.veTudo) && (
+          <Grupo id="moradores" titulo="Moradores" icone={Users} rotas={[ROTAS.APARTAMENTOS, ROTAS.PESSOA, ROTAS.VAGAS, ROTAS.VEICULOS]}>
+            {permissoes.acessaCadastros && <ItemMenu para={ROTAS.APARTAMENTOS} icone={DoorOpen}>Apartamentos</ItemMenu>}
+            {permissoes.acessaCadastros && <ItemMenu para={ROTAS.PESSOA} icone={Users}>Pessoas</ItemMenu>}
+            {permissoes.veTudo && <ItemMenu para={ROTAS.VAGAS} icone={CarFront}>Vagas</ItemMenu>}
+            {permissoes.acessaCadastros && <ItemMenu para={ROTAS.VEICULOS} icone={Car}>Veículos</ItemMenu>}
+          </Grupo>
         )}
       </VStack>
+    </>
+  );
 
-      <Button as={RouterLink}to={ROTAS.TROCAR_SENHA}variant="ghost"size="sm"justifyContent="flex-start"leftIcon={
-      <Icon as={KeyRound}boxSize={4}/>}>Trocar senha</Button>
-      <Button variant="outline"size="sm"colorScheme="red"onClick={sair}justifyContent="flex-start"leftIcon={
-      <Icon as={LogOut}boxSize={4}/>}>Sair</Button>
-    </Flex>
+  return (
+    <>
+      {/* CELULAR: barra no topo + menu em gaveta */}
+      <Flex display={{ base: "flex", md: "none" }} position="sticky" top={0} zIndex={20} width="100%" align="center" gap={2}
+        bg="white" borderBottom="1px solid" borderColor="gray.100" boxShadow="sm" paddingX={3} paddingY={2}>
+        <IconButton aria-label="Abrir menu" size="sm" variant="ghost" icon={<Icon as={MenuIcon} boxSize={5} />} onClick={menuCelular.onOpen} />
+        <Box flex={1} minWidth={0}>
+          <Text fontWeight="semibold" color="gray.800" noOfLines={1}>{pagina.titulo}</Text>
+          {condominioAtual && <Text fontSize="2xs" color="gray.500" noOfLines={1}>{condominioAtual.nome}</Text>}
+        </Box>
+        {icones}
+      </Flex>
+      <Drawer isOpen={menuCelular.isOpen} onClose={menuCelular.onClose} placement="left" size="xs">
+        <DrawerOverlay />
+        <DrawerContent>
+          <DrawerCloseButton />
+          <DrawerHeader paddingBottom={1}>
+            <Text fontSize="md">Olá, {user?.full_name}</Text>
+            <Text fontSize="xs" fontWeight="normal" color="gray.500">{pagina.descricao}</Text>
+          </DrawerHeader>
+          <DrawerBody display="flex" flexDirection="column" gap={5} paddingBottom={6}>{conteudo}</DrawerBody>
+        </DrawerContent>
+      </Drawer>
+
+      {/* COMPUTADOR: menu lateral */}
+      <Flex as="aside" display={{ base: "none", md: "flex" }} direction="column" width="260px" minWidth="260px" height="100vh" position="sticky" top={0}
+        padding={5} gap={5} overflowY="auto" bg="white" borderRight="1px solid" borderColor="gray.100" boxShadow="sm">
+        <Box>
+          <Flex justify="space-between" align="center" gap={2}>
+            <Heading size="md" color="gray.800" noOfLines={1}>{pagina.titulo}</Heading>
+            {icones}
+          </Flex>
+          <Text marginTop={1} color="gray.500" fontSize="sm">Olá, {user?.full_name}</Text>
+          <Text color="gray.500" fontSize="xs">{pagina.descricao}</Text>
+        </Box>
+        {conteudo}
+      </Flex>
+    </>
   );
 };

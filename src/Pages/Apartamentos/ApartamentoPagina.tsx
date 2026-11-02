@@ -9,6 +9,7 @@
 //  - financeiro: cotas da unidade (só leitura; lançamentos na página Financeiro)
 // ---------------------------------------------------------
 
+import { formatarFracao } from "../FracaoIdeal/FracaoIdeal";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import type { ElementType, ReactNode } from "react";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
@@ -170,7 +171,7 @@ export const ApartamentoPagina = () => {
 
   if (carregando) {
     return (
-      <Flex align="flex-start" gap={6} direction={{ base: "column", md: "row" }}>
+      <Flex align="flex-start" gap={{ base: 0, md: 6 }} direction={{ base: "column", md: "row" }}>
         <Titulo />
         <Flex flex={1} justify="center" padding={16}><Spinner color="blue.500" size="lg" /></Flex>
       </Flex>
@@ -179,7 +180,7 @@ export const ApartamentoPagina = () => {
 
   if (!apto) {
     return (
-      <Flex align="flex-start" gap={6} direction={{ base: "column", md: "row" }}>
+      <Flex align="flex-start" gap={{ base: 0, md: 6 }} direction={{ base: "column", md: "row" }}>
         <Titulo />
         <Box padding={10}>
           <Text color="gray.600">Apartamento não encontrado.</Text>
@@ -375,9 +376,9 @@ export const ApartamentoPagina = () => {
   );
 
   return (
-    <Flex align="flex-start" gap={6} direction={{ base: "column", md: "row" }}>
+    <Flex align="flex-start" gap={{ base: 0, md: 6 }} direction={{ base: "column", md: "row" }}>
       <Titulo />
-      <Box flex={1} minWidth={0} paddingY={6} paddingRight={{ md: 6 }}>
+      <Box flex={1} minWidth={0} paddingY={6} paddingX={{ base: 4, md: 0 }} paddingRight={{ md: 6 }}>
         {/* CABEÇALHO */}
         <Button as={RouterLink} to="/Apartamentos" size="sm" variant="ghost" leftIcon={<ArrowBackIcon />} marginBottom={3} marginLeft={-3}>{permissoes.veTudo ? "Apartamentos" : "Minhas unidades"}</Button>
         <Flex justify="space-between" align="flex-start" gap={4} wrap="wrap" marginBottom={6}>
@@ -388,7 +389,8 @@ export const ApartamentoPagina = () => {
               {!apto.ativo && <Badge colorScheme="red" borderRadius="full" paddingX={2.5} textTransform="none">Inativo</Badge>}
             </Flex>
             <Text fontSize="sm" color="gray.500" marginTop={1}>
-              {[apto.andar !== null ? `${apto.andar}º andar` : "Andar não informado", apto.observacao].filter(Boolean).join(" · ")}
+              {[apto.andar !== null ? `${apto.andar}º andar` : "Andar não informado",
+                `Fração ideal: ${apto.fracao_ideal != null ? `${formatarFracao(apto.fracao_ideal)}%` : "não informada"}`, apto.observacao].filter(Boolean).join(" · ")}
             </Text>
           </Box>
           {permissoes.editaTudo && (
@@ -543,7 +545,7 @@ export const ApartamentoPagina = () => {
             <ModalHeader>Editar unidade</ModalHeader>
             <ModalCloseButton />
             <ModalBody>
-              <SimpleGrid columns={3} spacing={3}>
+              <SimpleGrid columns={{ base: 1, sm: 3 }} spacing={3}>
                 <FormControl>
                   <FormLabel fontSize="sm">Bloco</FormLabel>
                   <Input value={formUnidade.bloco} onChange={(e) => setFormUnidade({ ...formUnidade, bloco: e.target.value })} />
@@ -583,7 +585,7 @@ export const ApartamentoPagina = () => {
             <ModalHeader>{vagaEditando ? `Editar vaga ${vagaEditando.numero}` : "Nova vaga fixa da unidade"}</ModalHeader>
             <ModalCloseButton />
             <ModalBody>
-              <SimpleGrid columns={2} spacing={3}>
+              <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={3}>
                 <FormControl isRequired>
                   <FormLabel fontSize="sm">Número da vaga</FormLabel>
                   <Input value={formVaga.numero} onChange={(e) => setFormVaga({ ...formVaga, numero: e.target.value })} placeholder="Ex.: 12" autoFocus />
