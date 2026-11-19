@@ -4,7 +4,7 @@ import { usePermissoes } from "../../Components/permissoes";
 import {Badge,Box,Button,Collapse,Drawer,DrawerBody,DrawerCloseButton,DrawerContent,DrawerHeader,DrawerOverlay,Flex,Heading,Icon,IconButton,Select,Text,Tooltip,VStack,useDisclosure} from "@chakra-ui/react";
 import { useEffect, useState, type ElementType, type ReactNode } from "react";
 import {Link as RouterLink,useLocation,useNavigate} from "react-router-dom";
-import {Building2,Car,Landmark,ChartPie,Wrench,Handshake,ChevronDown,ClipboardList,Settings,HardDrive,LayoutDashboard,UserCog,CarFront,DoorOpen,Home,KeyRound,ListChecks,LogOut,Megaphone,Menu as MenuIcon,MessageCircle,MessageSquare,Users,Wallet} from "lucide-react";
+import {Briefcase,Car,Landmark,ChartPie,Receipt,Wrench,Handshake,ChevronDown,ClipboardList,Settings,HardDrive,LayoutDashboard,UserCog,CarFront,DoorOpen,Home,KeyRound,ListChecks,LogOut,Megaphone,Menu as MenuIcon,MessageCircle,MessageSquare,Users,Wallet} from "lucide-react";
 
 export const ROTAS = {
   INICIO: "/",
@@ -117,6 +117,13 @@ export const Titulo = () => {
 
   const ehAdm = Boolean(user?.admin_sistema);
   const veWhatsApp = ehAdm || Boolean(user?.responsavel) || Boolean(user?.condominios.some((c) => c.perfil === "SINDICO"));
+  const veManutencoes = Boolean(condominioAtual) && permissoes.veTudo;
+  const vePrestadores = Boolean(condominioAtual) && permissoes.veFinanceiroTudo;
+  const veDrive = ehAdm || permissoes.editaTudo;
+  // cada tópico só aparece se tiver ao menos um item visível
+  const mostraComunicacao = Boolean(condominioAtual) || veWhatsApp;
+  const mostraFinanceiro = permissoes.acessaFinanceiro || permissoes.veFinanceiroTudo;
+  const mostraGestao = permissoes.acessaTarefas || veManutencoes || vePrestadores || veDrive;
 
   const icones = (
     <Flex gap={1} flexShrink={0}>
@@ -129,7 +136,7 @@ export const Titulo = () => {
     </Flex>
   );
 
-  // condomínio atual + as 3 seções do menu (usado no desktop e na gaveta do celular)
+  // condomínio atual + os tópicos do menu (usado no desktop e na gaveta do celular)
   const conteudo = (
     <>
       {user && user.condominios.length > 0 && (
@@ -160,26 +167,37 @@ export const Titulo = () => {
           </Grupo>
         )}
 
-        {/* ADMINISTRAÇÃO DO CONDOMÍNIO */}
-        {(condominioAtual || veWhatsApp) && (
-          <Grupo id="administracao" titulo={permissoes.editaTudo || veWhatsApp ? "Condomínio" : "Condomínio"} icone={Building2}
-            rotas={[ROTAS.AVISOS, ROTAS.ATENDIMENTO, ROTAS.TAREFAS, ROTAS.FINANCEIRO, ROTAS.MOVIMENTACOES, ROTAS.FRACAO_IDEAL, ROTAS.WHATSAPP, ROTAS.MANUTENCOES, ROTAS.PRESTADORES, ROTAS.DRIVE]}>
+        {/* COMUNICAÇÃO */}
+        {mostraComunicacao && (
+          <Grupo id="comunicacao" titulo="Comunicação" icone={Megaphone} rotas={[ROTAS.AVISOS, ROTAS.ATENDIMENTO, ROTAS.WHATSAPP]}>
             {condominioAtual && <ItemMenu para={ROTAS.AVISOS} icone={Megaphone}>Avisos</ItemMenu>}
             {condominioAtual && <ItemMenu para={ROTAS.ATENDIMENTO} icone={MessageSquare}>{permissoes.editaTudo ? "Atendimento" : "Fale com o síndico"}</ItemMenu>}
-            {permissoes.acessaTarefas && <ItemMenu para={ROTAS.TAREFAS} icone={ListChecks}>Tarefas</ItemMenu>}
-            {permissoes.acessaFinanceiro && <ItemMenu para={ROTAS.FINANCEIRO} icone={Wallet}>Financeiro</ItemMenu>}
-            {permissoes.veFinanceiroTudo && <ItemMenu para={ROTAS.MOVIMENTACOES} icone={Landmark}>Conta bancária</ItemMenu>}
-            {permissoes.veFinanceiroTudo && <ItemMenu para={ROTAS.FRACAO_IDEAL} icone={ChartPie}>Fração ideal</ItemMenu>}
             {veWhatsApp && <ItemMenu para={ROTAS.WHATSAPP} icone={MessageCircle}>WhatsApp</ItemMenu>}
-            {condominioAtual && permissoes.veTudo && <ItemMenu para={ROTAS.MANUTENCOES} icone={Wrench}>Manutenções</ItemMenu>}
-            {condominioAtual && permissoes.veFinanceiroTudo && <ItemMenu para={ROTAS.PRESTADORES} icone={Handshake}>Prestadores</ItemMenu>}
-            {(ehAdm || permissoes.editaTudo) && <ItemMenu para={ROTAS.DRIVE} icone={HardDrive}>Arquivos (Drive)</ItemMenu>}
           </Grupo>
         )}
 
-        {/* MORADORES */}
+        {/* FINANCEIRO */}
+        {mostraFinanceiro && (
+          <Grupo id="financeiro" titulo="Financeiro" icone={Wallet} rotas={[ROTAS.FINANCEIRO, ROTAS.MOVIMENTACOES, ROTAS.FRACAO_IDEAL]}>
+            {permissoes.acessaFinanceiro && <ItemMenu para={ROTAS.FINANCEIRO} icone={Receipt}>Cotas condominiais</ItemMenu>}
+            {permissoes.veFinanceiroTudo && <ItemMenu para={ROTAS.MOVIMENTACOES} icone={Landmark}>Conta bancária</ItemMenu>}
+            {permissoes.veFinanceiroTudo && <ItemMenu para={ROTAS.FRACAO_IDEAL} icone={ChartPie}>Fração ideal</ItemMenu>}
+          </Grupo>
+        )}
+
+        {/* GESTÃO (rotina da administração) */}
+        {mostraGestao && (
+          <Grupo id="gestao" titulo="Gestão" icone={Briefcase} rotas={[ROTAS.TAREFAS, ROTAS.MANUTENCOES, ROTAS.PRESTADORES, ROTAS.DRIVE]}>
+            {permissoes.acessaTarefas && <ItemMenu para={ROTAS.TAREFAS} icone={ListChecks}>Tarefas</ItemMenu>}
+            {veManutencoes && <ItemMenu para={ROTAS.MANUTENCOES} icone={Wrench}>Manutenções</ItemMenu>}
+            {vePrestadores && <ItemMenu para={ROTAS.PRESTADORES} icone={Handshake}>Prestadores</ItemMenu>}
+            {veDrive && <ItemMenu para={ROTAS.DRIVE} icone={HardDrive}>Arquivos (Drive)</ItemMenu>}
+          </Grupo>
+        )}
+
+        {/* UNIDADES E MORADORES */}
         {(permissoes.acessaCadastros || permissoes.veTudo) && (
-          <Grupo id="moradores" titulo="Moradores" icone={Users} rotas={[ROTAS.APARTAMENTOS, ROTAS.PESSOA, ROTAS.VAGAS, ROTAS.VEICULOS]}>
+          <Grupo id="moradores" titulo="Unidades e moradores" icone={Users} rotas={[ROTAS.APARTAMENTOS, ROTAS.PESSOA, ROTAS.VAGAS, ROTAS.VEICULOS]}>
             {permissoes.acessaCadastros && <ItemMenu para={ROTAS.APARTAMENTOS} icone={DoorOpen}>Apartamentos</ItemMenu>}
             {permissoes.acessaCadastros && <ItemMenu para={ROTAS.PESSOA} icone={Users}>Pessoas</ItemMenu>}
             {permissoes.veTudo && <ItemMenu para={ROTAS.VAGAS} icone={CarFront}>Vagas</ItemMenu>}
