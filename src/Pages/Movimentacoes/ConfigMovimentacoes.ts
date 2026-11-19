@@ -71,6 +71,7 @@ export type FluxoCaixa = { ano: number; anos: number[]; contas: ContaFluxo[]; to
 
 // saldo lido no banco numa data, digitado pela gestão (tabela única saldos_informados)
 //   CONTA: saldo da conta corrente | CDB: saldo líquido do CDB (fundo de reserva)
+export type Favorecido = { favorecido: string; cpf_cnpj: string | null; quantidade: number; total: string; ultimo_pagamento: string };
 export type TipoSaldo = "CONTA" | "CDB";
 export type SaldoInformado = { id: string; tipo: TipoSaldo; agencia: string; conta: string; descricao: string | null; data: string; valor: string; created_at: string };
 
