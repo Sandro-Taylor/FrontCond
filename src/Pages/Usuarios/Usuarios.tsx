@@ -2,7 +2,7 @@
 // USUÁRIOS DO SISTEMA (somente ADM)
 // ---------------------------------------------------------
 // Todos os logins, com os condomínios e o perfil em cada um.
-// Ações: bloquear/desbloquear, gerar nova senha temporária e
+// Ações: criar login (com opção de ADM do sistema), bloquear/desbloquear, gerar nova senha temporária e
 // marcar o RESPONSÁVEL (recebe as mensagens do WhatsApp).
 // O acesso a um condomínio é dado em Pessoas (ou ao designar
 // o síndico no painel).
@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  Badge, Box, Button, Flex, Input, InputGroup, InputLeftElement, Modal, ModalBody, ModalCloseButton, ModalContent, ModalFooter,
+  Badge, Box, Button, Checkbox, Flex, FormControl, FormLabel, Input, InputGroup, InputLeftElement, Modal, ModalBody, ModalCloseButton, ModalContent, ModalFooter,
   ModalHeader, ModalOverlay, Select, Spinner, Table, TableContainer, Tbody, Td, Text, Th, Thead, Tr, useDisclosure, useToast,
 } from "@chakra-ui/react";
 import { SearchIcon } from "@chakra-ui/icons";
@@ -37,6 +37,8 @@ const api = {
   listar: () => chamarApi<Usuario[]>("/users/", "GET", "Não foi possível carregar os usuários."),
   status: (id: string, status: "ativo" | "bloqueado") => chamarApi<void>(`/users/${id}/status`, "PATCH", "Não foi possível alterar o usuário.", { status }),
   responsavel: (id: string, responsavel: boolean) => chamarApi<void>(`/users/${id}/responsavel`, "PATCH", "Não foi possível alterar o usuário.", { responsavel }),
+  criar: (dados: { full_name: string; email: string; admin_sistema: boolean }) =>
+    chamarApi<{ email: string; senha_temporaria: string }>("/users/", "POST", "Não foi possível criar o usuário.", dados),
   novaSenha: (id: string) => chamarApi<{ email: string; senha_temporaria: string }>(`/users/${id}/nova-senha`, "POST", "Não foi possível gerar a senha."),
 };
 
@@ -46,12 +48,16 @@ export const Usuarios = () => {
   const toast = useToast();
   const { user } = useAuth();
   const modalSenha = useDisclosure();
+  const modalNovo = useDisclosure();
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState("");
   const [senha, setSenha] = useState<{ email: string; senha_temporaria: string } | null>(null);
+  const [tituloSenha, setTituloSenha] = useState("Nova senha gerada");
+  const [novo, setNovo] = useState({ full_name: "", email: "", admin_sistema: false });
+  const [salvando, setSalvando] = useState(false);
 
   const carregar = useCallback(async () => {
     try { setUsuarios(await api.listar()); }
@@ -81,10 +87,33 @@ export const Usuarios = () => {
     } catch (e) { toast({ title: e instanceof Error ? e.message : "Erro ao alterar o usuário", status: "error" }); }
   }
 
+  function abrirNovo() {
+    setNovo({ full_name: "", email: "", admin_sistema: false });
+    modalNovo.onOpen();
+  }
+
+  async function criarUsuario() {
+    if (novo.full_name.trim().length < 3 || !novo.email.includes("@")) {
+      toast({ title: "Informe o nome e um e-mail válido", status: "warning" });
+      return;
+    }
+    setSalvando(true);
+    try {
+      const criado = await api.criar({ ...novo, full_name: novo.full_name.trim(), email: novo.email.trim() });
+      modalNovo.onClose();
+      setSenha(criado);
+      setTituloSenha("Usuário criado");
+      modalSenha.onOpen();
+      await carregar();
+    } catch (e) { toast({ title: e instanceof Error ? e.message : "Erro ao criar o usuário", status: "error" }); }
+    finally { setSalvando(false); }
+  }
+
   async function gerarSenha(u: Usuario) {
     if (!window.confirm(`Gerar uma nova senha para ${u.full_name}? A senha atual deixa de funcionar.`)) return;
     try {
       setSenha(await api.novaSenha(u.id));
+      setTituloSenha("Nova senha gerada");
       modalSenha.onOpen();
       await carregar();
     } catch (e) { toast({ title: e instanceof Error ? e.message : "Erro ao gerar a senha", status: "error" }); }
@@ -134,6 +163,7 @@ export const Usuarios = () => {
             <option value="SEM_CONDOMINIO">Sem condomínio</option>
             {nomesCondominios.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
           </Select>
+          <Button colorScheme="blue" borderRadius="lg" marginLeft={{ md: "auto" }} flexShrink={0} onClick={abrirNovo}>Novo usuário</Button>
         </Flex>
 
         {carregando ? (
@@ -201,10 +231,36 @@ export const Usuarios = () => {
         <Modal isOpen={modalSenha.isOpen} onClose={modalSenha.onClose} isCentered>
           <ModalOverlay />
           <ModalContent borderRadius="2xl">
-            <ModalHeader>Nova senha gerada</ModalHeader>
+            <ModalHeader>{tituloSenha}</ModalHeader>
             <ModalCloseButton />
             <ModalBody>{senha && <SenhaTemporaria email={senha.email} senha={senha.senha_temporaria} />}</ModalBody>
             <ModalFooter><Button colorScheme="blue" onClick={modalSenha.onClose}>Fechar</Button></ModalFooter>
+          </ModalContent>
+        </Modal>
+
+        <Modal isOpen={modalNovo.isOpen} onClose={modalNovo.onClose} isCentered>
+          <ModalOverlay />
+          <ModalContent borderRadius="2xl" marginX={4}>
+            <ModalHeader>Novo usuário</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody display="flex" flexDirection="column" gap={4}>
+              <FormControl isRequired>
+                <FormLabel fontSize="sm">Nome completo</FormLabel>
+                <Input value={novo.full_name} onChange={(e) => setNovo({ ...novo, full_name: e.target.value })} />
+              </FormControl>
+              <FormControl isRequired>
+                <FormLabel fontSize="sm">E-mail (login)</FormLabel>
+                <Input type="email" value={novo.email} onChange={(e) => setNovo({ ...novo, email: e.target.value })} />
+              </FormControl>
+              <Checkbox isChecked={novo.admin_sistema} onChange={(e) => setNovo({ ...novo, admin_sistema: e.target.checked })}>
+                ADM do sistema (acesso total, igual ao seu)
+              </Checkbox>
+              <Text fontSize="xs" color="gray.500">Uma senha temporária será gerada. No primeiro login a pessoa cria a própria senha.</Text>
+            </ModalBody>
+            <ModalFooter gap={2}>
+              <Button variant="ghost" onClick={modalNovo.onClose}>Cancelar</Button>
+              <Button colorScheme="blue" isLoading={salvando} onClick={criarUsuario}>Criar</Button>
+            </ModalFooter>
           </ModalContent>
         </Modal>
       </Box>
