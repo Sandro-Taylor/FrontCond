@@ -31,11 +31,44 @@ export type Cota = {
   observacao: string | null;
 };
 
+export type FormaRateio = "FIXO" | "DESPESAS" | "ORCAMENTO";
+
+export const ROTULOS_RATEIO: Record<FormaRateio, { rotulo: string; ajuda: string }> = {
+  FIXO: { rotulo: "Valor fixo igual para todas as unidades", ajuda: "Todas as unidades pagam o mesmo valor." },
+  DESPESAS: { rotulo: "Rateio das despesas do mês anterior", ajuda: "Soma das despesas reais do mês anterior (pelo plano de contas) x fração ideal de cada unidade." },
+  ORCAMENTO: { rotulo: "Orçamento mensal fixo", ajuda: "Orçamento aprovado em assembleia x fração ideal de cada unidade." },
+};
+
 export type Configuracao = {
   valor_cota: number | null;
   dia_vencimento: number;
   multa_percentual: number;
   juros_mensal: number;
+  rateio_forma: FormaRateio;
+  orcamento_mensal: number | null;
+  fundo_reserva_percentual: number;
+  pix_chave: string | null;
+  pix_nome: string | null;
+  pix_cidade: string | null;
+};
+
+export type SituacaoTaxa = "A_INICIAR" | "EM_ANDAMENTO" | "ENCERRADA" | "INATIVA";
+export type TaxaExtra = {
+  id: string;
+  descricao: string;
+  valor_mensal: string;
+  parcelas: number | null;
+  inicio: string; // "2026-03-01"
+  ativo: boolean;
+  parcela_atual: number | null;
+  situacao: SituacaoTaxa;
+};
+export type DadosTaxa = { descricao: string; valor_mensal: number; parcelas: number | null; inicio: string; ativo: boolean };
+export const ROTULOS_SITUACAO_TAXA: Record<SituacaoTaxa, { rotulo: string; cor: string }> = {
+  A_INICIAR: { rotulo: "A iniciar", cor: "purple" },
+  EM_ANDAMENTO: { rotulo: "Em andamento", cor: "green" },
+  ENCERRADA: { rotulo: "Encerrada", cor: "gray" },
+  INATIVA: { rotulo: "Inativa", cor: "gray" },
 };
 
 export type CotaCriar = {
@@ -107,8 +140,15 @@ async function chamar<T>(caminho: string, metodo: string, padrao: string, corpo?
   return response.json();
 }
 
+export type PixCota = { copia_cola: string; qr_svg: string; valor: number; vencimento: string; atrasada: boolean; recebedor: string; chave: string };
+
 export const apiFinanceiro = {
+  pix: (id: string) => chamar<PixCota>(`/financeiro/cotas/${id}/pix`, "GET", "Não foi possível gerar o PIX."),
   configuracao: () => chamar<Configuracao>("/financeiro/configuracao", "GET", "Não foi possível carregar a configuração."),
+  taxas: () => chamar<TaxaExtra[]>("/financeiro/taxas-extras/", "GET", "Não foi possível carregar as taxas extras."),
+  criarTaxa: (dados: DadosTaxa) => chamar<TaxaExtra>("/financeiro/taxas-extras/", "POST", "Não foi possível salvar a taxa.", dados),
+  editarTaxa: (id: string, dados: DadosTaxa) => chamar<TaxaExtra>(`/financeiro/taxas-extras/${id}`, "PUT", "Não foi possível salvar a taxa.", dados),
+  excluirTaxa: (id: string) => chamar<void>(`/financeiro/taxas-extras/${id}`, "DELETE", "Não foi possível excluir a taxa."),
   salvarConfiguracao: (dados: Configuracao) => chamar<Configuracao>("/financeiro/configuracao", "PUT", "Não foi possível salvar a configuração.", dados),
   listar: (filtros: { competencia?: string; apartamento_id?: string } = {}) => {
     const params = new URLSearchParams();

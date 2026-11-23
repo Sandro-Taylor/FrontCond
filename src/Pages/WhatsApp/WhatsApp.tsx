@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  Badge, Box, Button, Flex, Icon, Image, Input, InputGroup, InputLeftElement, Spinner, Stack, Text, Textarea, useToast,
+  Badge, Box, Button, Flex, Icon, Image, Input, InputGroup, InputLeftElement, Spinner, Stack, Switch, Text, Textarea, useToast,
 } from "@chakra-ui/react";
 import { SearchIcon } from "@chakra-ui/icons";
 import { Bot, MessageCircle, QrCode, Send, Unplug, UserRound } from "lucide-react";
@@ -25,6 +25,24 @@ import {
 } from "./ConfigWhatsApp";
 
 const ATUALIZAR_MS = 5000;
+
+// ROBÔ: LIGAR / DESLIGAR (resposta automática)
+const PainelRobo = ({ ativo, podeAlterar, aoAlterar }: { ativo: boolean | null; podeAlterar: boolean; aoAlterar: (ativo: boolean) => void }) => (
+  <Flex align="center" justify="space-between" gap={4} wrap="wrap" marginBottom={4} paddingX={5} paddingY={3} border="1px solid" borderColor="gray.200" borderRadius="md" bg="white">
+    <Flex align="center" gap={3}>
+      <Icon as={Bot} boxSize={5} color={ativo ? "green.500" : "gray.400"} />
+      <Box>
+        <Text fontWeight="semibold" color="gray.800">Resposta automática (robô): {ativo === null ? "..." : ativo ? "ligada" : "desligada"}</Text>
+        <Text fontSize="sm" color="gray.500">
+          {ativo ? "O robô responde primeiro com o menu. Você recebe a conversa quando a pessoa pede atendimento ou quando você assume." : "Ninguém recebe resposta automática. Toda mensagem chega para vocês responderem."}
+        </Text>
+      </Box>
+    </Flex>
+    {podeAlterar && ativo !== null && (
+      <Switch colorScheme="green" size="lg" isChecked={ativo} onChange={(e) => aoAlterar(e.target.checked)} />
+    )}
+  </Flex>
+);
 
 // CONEXÃO DO NÚMERO
 const PainelConexao = ({ podeConectar }: { podeConectar: boolean }) => {
@@ -136,6 +154,7 @@ export const WhatsApp = () => {
   const [resposta, setResposta] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [busca, setBusca] = useState("");
+  const [roboAtivo, setRoboAtivo] = useState<boolean | null>(null);
   const abertaId = aberta?.id;
   const ehSindico = Boolean(user?.condominios.some((c) => c.perfil === "SINDICO"));
   const temAcesso = Boolean(user?.admin_sistema || user?.responsavel || ehSindico);
@@ -158,6 +177,20 @@ export const WhatsApp = () => {
     }, ATUALIZAR_MS);
     return () => clearInterval(timer);
   }, [carregarLista, abertaId, temAcesso]);
+
+  useEffect(() => {
+    if (!temAcesso) return;
+    apiWhatsApp.robo().then((r) => setRoboAtivo(r.ativo)).catch(() => { /* mostra "..." */ });
+  }, [temAcesso]);
+
+  async function alterarRobo(ativo: boolean) {
+    if (!ativo && !window.confirm("Desligar a resposta automática? Todas as mensagens passam a chegar para vocês responderem.")) return;
+    try {
+      const r = await apiWhatsApp.ligarRobo(ativo);
+      setRoboAtivo(r.ativo);
+      toast({ title: r.ativo ? "Resposta automática ligada" : "Resposta automática desligada", status: "success" });
+    } catch (e) { toast({ title: e instanceof Error ? e.message : "Erro ao alterar o robô", status: "error" }); }
+  }
 
   useEffect(() => { fimConversa.current?.scrollIntoView({ block: "end" }); }, [aberta?.id, aberta?.mensagens.length]);
 
@@ -226,6 +259,7 @@ export const WhatsApp = () => {
         </Box>
 
         <PainelConexao podeConectar={Boolean(user?.admin_sistema)} />
+        <PainelRobo ativo={roboAtivo} podeAlterar={Boolean(user?.admin_sistema || user?.responsavel)} aoAlterar={alterarRobo} />
 
         {carregando ? (
           <Flex justify="center" padding={16}><Spinner color="green.500" size="lg" /></Flex>
@@ -287,7 +321,9 @@ export const WhatsApp = () => {
                       {aberta.contatos.length ? aberta.contatos.join(" | ") : "Telefone não cadastrado no sistema"}
                     </Text>
                       </Box>
-                      {aberta.modo === "ATENDENTE" ? (
+                      {roboAtivo === false ? (
+                        <Badge colorScheme="orange" textTransform="none">Robô desligado: você atende</Badge>
+                      ) : aberta.modo === "ATENDENTE" ? (
                         <Flex align="center" gap={2}>
                           <Badge colorScheme="orange" textTransform="none">Em atendimento</Badge>
                           <Button size="xs" variant="outline" leftIcon={<Icon as={Bot} boxSize={3.5} />} onClick={() => trocarModo("devolver")}>Encerrar e devolver ao robô</Button>

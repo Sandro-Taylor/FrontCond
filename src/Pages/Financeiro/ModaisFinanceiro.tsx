@@ -9,14 +9,14 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
   Button, FormControl, FormHelperText, FormLabel, Input, InputGroup, InputLeftAddon, InputRightAddon, Modal, ModalBody,
-  ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalOverlay, Select, SimpleGrid, Text, Textarea, useToast,
+  ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalOverlay, Select, SimpleGrid, Stack, Text, Textarea, useToast,
 } from "@chakra-ui/react";
 
 import { rotuloApartamento } from "../Pessoas/ConfigPessoas";
 import type { ApartamentoResumo } from "../Apartamentos/ConfigApartamentos";
 import {
-  ROTULOS_FORMA_PAGAMENTO, formatarCompetencia, formatarMoeda, hojeIso, lerValor, mesAtual, valorParaTexto,
-  type Configuracao, type Cota, type CotaCriar, type CotaEditar, type FormaPagamento, type Pagamento, type TipoCota,
+  ROTULOS_FORMA_PAGAMENTO, ROTULOS_RATEIO, formatarCompetencia, formatarMoeda, hojeIso, lerValor, mesAtual, valorParaTexto,
+  type Configuracao, type Cota, type FormaRateio, type CotaCriar, type CotaEditar, type FormaPagamento, type Pagamento, type TipoCota,
 } from "./ConfigFinanceiro";
 
 // estrutura comum dos modais
@@ -62,60 +62,133 @@ export const ModalConfiguracao = ({ aberto, aoFechar, configuracao, aoSalvar }: 
   aberto: boolean; aoFechar: () => void; configuracao: Configuracao | null; aoSalvar: Salvar<Configuracao>;
 }) => {
   const toast = useToast();
-  const [form, setForm] = useState({ valor: "", dia: "10", multa: "2", juros: "1" });
+  const [form, setForm] = useState({
+    forma: "FIXO" as FormaRateio, valor: "", orcamento: "", reserva: "0", dia: "10", multa: "2", juros: "1",
+    pixChave: "", pixNome: "", pixCidade: "",
+  });
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
     if (!aberto || !configuracao) return;
     setForm({
+      forma: configuracao.rateio_forma,
       valor: valorParaTexto(configuracao.valor_cota),
+      orcamento: valorParaTexto(configuracao.orcamento_mensal),
+      reserva: valorParaTexto(configuracao.fundo_reserva_percentual),
       dia: String(configuracao.dia_vencimento),
       multa: valorParaTexto(configuracao.multa_percentual),
       juros: valorParaTexto(configuracao.juros_mensal),
+      pixChave: configuracao.pix_chave ?? "", pixNome: configuracao.pix_nome ?? "", pixCidade: configuracao.pix_cidade ?? "",
     });
   }, [aberto, configuracao]);
 
+  const mudar = (campo: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [campo]: e.target.value });
+  const percentual = (campo: "reserva" | "multa" | "juros") => (e: { target: { value: string } }) => setForm({ ...form, [campo]: e.target.value.replace(/[^\d.,]/g, "") });
+
   async function salvar() {
     const valor = form.valor.trim() ? lerValor(form.valor) : null;
+    const orcamento = form.orcamento.trim() ? lerValor(form.orcamento) : null;
     const dia = Number(form.dia);
     const multa = lerValor(form.multa || "0");
     const juros = lerValor(form.juros || "0");
-    if ((valor !== null && !(valor > 0)) || !(dia >= 1 && dia <= 31) || Number.isNaN(multa) || Number.isNaN(juros)) {
+    const reserva = lerValor(form.reserva || "0");
+    if ((valor !== null && !(valor > 0)) || (orcamento !== null && !(orcamento > 0)) || !(dia >= 1 && dia <= 31)
+      || [multa, juros, reserva].some((n) => Number.isNaN(n) || n < 0 || n > 100)) {
       toast({ title: "Confira os valores informados", status: "warning" });
       return;
     }
+    if (form.forma === "ORCAMENTO" && !orcamento) { toast({ title: "Informe o orçamento mensal", status: "warning" }); return; }
+    if (form.pixChave.trim() && (!form.pixNome.trim() || !form.pixCidade.trim())) {
+      toast({ title: "Informe o nome e a cidade do recebedor do PIX", status: "warning" });
+      return;
+    }
     setSalvando(true);
-    try { await aoSalvar({ valor_cota: valor, dia_vencimento: dia, multa_percentual: multa, juros_mensal: juros }); }
-    finally { setSalvando(false); }
+    try {
+      await aoSalvar({
+        valor_cota: valor, dia_vencimento: dia, multa_percentual: multa, juros_mensal: juros,
+        rateio_forma: form.forma, orcamento_mensal: orcamento, fundo_reserva_percentual: reserva,
+        pix_chave: form.pixChave.trim() || null, pix_nome: form.pixNome.trim() || null, pix_cidade: form.pixCidade.trim() || null,
+      });
+    } finally { setSalvando(false); }
   }
 
+  const Secao = ({ titulo }: { titulo: string }) => (
+    <Text fontSize="xs" fontWeight="semibold" color="gray.500" textTransform="uppercase" letterSpacing="wide" marginTop={2}>{titulo}</Text>
+  );
+
   return (
-    <Janela aberto={aberto} aoFechar={aoFechar} titulo="Configuração do financeiro" salvando={salvando} aoSalvar={salvar}>
-      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
+    <Janela aberto={aberto} aoFechar={aoFechar} titulo="Configuração da cobrança" salvando={salvando} aoSalvar={salvar}>
+      <Stack spacing={4}>
+        <Secao titulo="Cota ordinária" />
         <FormControl>
-          <FormLabel fontSize="sm">Valor padrão da cota</FormLabel>
-          <CampoValor valor={form.valor} aoMudar={(valor) => setForm({ ...form, valor })} />
+          <FormLabel fontSize="sm">Forma de cálculo</FormLabel>
+          <Select value={form.forma} onChange={(e) => setForm({ ...form, forma: e.target.value as FormaRateio })}>
+            {(Object.keys(ROTULOS_RATEIO) as FormaRateio[]).map((f) => <option key={f} value={f}>{ROTULOS_RATEIO[f].rotulo}</option>)}
+          </Select>
+          <FormHelperText fontSize="xs">{ROTULOS_RATEIO[form.forma].ajuda}</FormHelperText>
         </FormControl>
+        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
+          {form.forma === "FIXO" && (
+            <FormControl>
+              <FormLabel fontSize="sm">Valor da cota</FormLabel>
+              <CampoValor valor={form.valor} aoMudar={(valor) => setForm({ ...form, valor })} />
+            </FormControl>
+          )}
+          {form.forma === "ORCAMENTO" && (
+            <FormControl isRequired>
+              <FormLabel fontSize="sm">Orçamento mensal total</FormLabel>
+              <CampoValor valor={form.orcamento} aoMudar={(orcamento) => setForm({ ...form, orcamento })} />
+            </FormControl>
+          )}
+          <FormControl>
+            <FormLabel fontSize="sm">Fundo de reserva</FormLabel>
+            <InputGroup>
+              <Input value={form.reserva} onChange={percentual("reserva")} inputMode="decimal" />
+              <InputRightAddon>% da ordinária</InputRightAddon>
+            </InputGroup>
+          </FormControl>
+        </SimpleGrid>
+
+        <Secao titulo="Vencimento e atraso" />
+        <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3}>
+          <FormControl>
+            <FormLabel fontSize="sm">Dia do vencimento</FormLabel>
+            <Input type="number" min={1} max={31} value={form.dia} onChange={mudar("dia")} />
+          </FormControl>
+          <FormControl>
+            <FormLabel fontSize="sm">Multa</FormLabel>
+            <InputGroup>
+              <Input value={form.multa} onChange={percentual("multa")} inputMode="decimal" />
+              <InputRightAddon>%</InputRightAddon>
+            </InputGroup>
+          </FormControl>
+          <FormControl>
+            <FormLabel fontSize="sm">Juros ao mês</FormLabel>
+            <InputGroup>
+              <Input value={form.juros} onChange={percentual("juros")} inputMode="decimal" />
+              <InputRightAddon>%</InputRightAddon>
+            </InputGroup>
+          </FormControl>
+        </SimpleGrid>
+
+        <Secao titulo="PIX (QR Code no recibo)" />
         <FormControl>
-          <FormLabel fontSize="sm">Dia do vencimento</FormLabel>
-          <Input type="number" min={1} max={31} value={form.dia} onChange={(e) => setForm({ ...form, dia: e.target.value })} />
+          <FormLabel fontSize="sm">Chave PIX do condomínio</FormLabel>
+          <Input value={form.pixChave} onChange={mudar("pixChave")} placeholder="CNPJ, e-mail, telefone ou chave aleatória" maxLength={77} />
         </FormControl>
-        <FormControl>
-          <FormLabel fontSize="sm">Multa por atraso</FormLabel>
-          <InputGroup>
-            <Input value={form.multa} onChange={(e) => setForm({ ...form, multa: e.target.value.replace(/[^\d.,]/g, "") })} inputMode="decimal" />
-            <InputRightAddon>%</InputRightAddon>
-          </InputGroup>
-        </FormControl>
-        <FormControl>
-          <FormLabel fontSize="sm">Juros ao mês</FormLabel>
-          <InputGroup>
-            <Input value={form.juros} onChange={(e) => setForm({ ...form, juros: e.target.value.replace(/[^\d.,]/g, "") })} inputMode="decimal" />
-            <InputRightAddon>%</InputRightAddon>
-          </InputGroup>
-          <FormHelperText fontSize="xs">Proporcional aos dias de atraso.</FormHelperText>
-        </FormControl>
-      </SimpleGrid>
+        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
+          <FormControl>
+            <FormLabel fontSize="sm">Nome do recebedor</FormLabel>
+            <Input value={form.pixNome} onChange={mudar("pixNome")} placeholder="COND EDIFICIO LAFAYETTE" maxLength={25} />
+            <FormHelperText fontSize="xs">Até 25 letras (limite do PIX).</FormHelperText>
+          </FormControl>
+          <FormControl>
+            <FormLabel fontSize="sm">Cidade</FormLabel>
+            <Input value={form.pixCidade} onChange={mudar("pixCidade")} placeholder="SAO PAULO" maxLength={15} />
+            <FormHelperText fontSize="xs">Até 15 letras.</FormHelperText>
+          </FormControl>
+        </SimpleGrid>
+      </Stack>
     </Janela>
   );
 };

@@ -17,6 +17,7 @@ export type Movimentacao = {
   cpf_cnpj: string | null;
   valor: string;
   tipo: TipoMovimentacao;
+  categoria_id: string | null;
 };
 
 export type ListaMovimentacoes = {
@@ -124,12 +125,18 @@ export function nomeConta(c: { agencia: string | null; conta: string | null }) {
 }
 
 export const apiMovimentacoes = {
-  listar: (mes: string, tipo: string) => {
+  // categoria: "" = todas | "SEM" = sem categoria | id de uma categoria ou de um grupo
+  listar: (mes: string, tipo: string, categoria = "") => {
     const filtros = new URLSearchParams();
     if (mes) filtros.set("mes", mes);
     if (tipo) filtros.set("tipo", tipo);
+    if (categoria === "SEM") filtros.set("sem_categoria", "true");
+    else if (categoria) filtros.set("categoria_id", categoria);
     return chamarApi<ListaMovimentacoes>(`/movimentacoes/?${filtros}`, "GET", "Não foi possível carregar as movimentações.");
   },
+  classificar: (id: string, categoria_id: string | null) =>
+    chamarApi<{ semelhantes: number }>(`/movimentacoes/${id}/categoria`, "PATCH", "Não foi possível classificar o lançamento.", { categoria_id }),
+  classificarPendentes: () => chamarApi<{ classificadas: number }>("/movimentacoes/classificar", "POST", "Não foi possível classificar."),
   meses: () => chamarApi<{ mes: string; quantidade: number }[]>("/movimentacoes/meses", "GET", "Não foi possível carregar os meses."),
   extratos: () => chamarApi<Extrato[]>("/movimentacoes/extratos", "GET", "Não foi possível carregar os extratos."),
   fluxo: (ano: number | null) => chamarApi<FluxoCaixa>(`/movimentacoes/fluxo${ano ? `?ano=${ano}` : ""}`, "GET", "Não foi possível carregar o fluxo de caixa."),
@@ -173,4 +180,22 @@ export const apiMovimentacoes = {
     if (!resposta.ok) throw new Error(await mensagemErro(resposta, "Não foi possível importar o extrato."));
     return resposta.json();
   },
+};
+
+// ---------------------------------------------------------
+// PLANO DE CONTAS
+// ---------------------------------------------------------
+export type TipoConta = "RECEITA" | "DESPESA" | "TRANSFERENCIA";
+export type CategoriaPlano = { id: string; nome: string; tipo: TipoConta; codigo: string | null; ordem: number; ativo: boolean; rateio: boolean; lancamentos: number };
+export type GrupoPlano = CategoriaPlano & { categorias: CategoriaPlano[] };
+
+export const ROTULOS_TIPO_CONTA: Record<TipoConta, string> = { RECEITA: "Receita", DESPESA: "Despesa", TRANSFERENCIA: "Movimentação interna" };
+export const CORES_TIPO_CONTA: Record<TipoConta, string> = { RECEITA: "green", DESPESA: "red", TRANSFERENCIA: "gray" };
+
+export const apiPlano = {
+  listar: () => chamarApi<GrupoPlano[]>("/plano-contas/", "GET", "Não foi possível carregar o plano de contas."),
+  criarPadrao: () => chamarApi<{ categorias: number; classificadas: number }>("/plano-contas/padrao", "POST", "Não foi possível criar o plano padrão."),
+  criar: (dados: { nome: string; tipo?: TipoConta; grupo_id?: string }) => chamarApi<{ id: string }>("/plano-contas/", "POST", "Não foi possível salvar.", dados),
+  alterar: (id: string, dados: { nome?: string; ativo?: boolean; rateio?: boolean }) => chamarApi<void>(`/plano-contas/${id}`, "PATCH", "Não foi possível salvar.", dados),
+  excluir: (id: string) => chamarApi<void>(`/plano-contas/${id}`, "DELETE", "Não foi possível excluir."),
 };

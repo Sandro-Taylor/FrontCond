@@ -3,7 +3,8 @@
 // ---------------------------------------------------------
 // Em cima: enviar o extrato do mês (.xlsx do banco).
 // Embaixo: todas as movimentações gravadas no banco de dados,
-// com filtro por mês e por tipo (entrada/saída).
+// com filtro por mês e por tipo (entrada/saída) e a CATEGORIA do
+// plano de contas de cada uma (o sistema aprende pelo favorecido).
 // Valor negativo = saída; positivo = entrada.
 // Envia: ADM e síndico. Vê: ADM, síndico e conselheiro.
 // Abas: Movimentações | Contas | Investimentos | Fluxo de caixa | Saldos | Despesas por favorecido | Previsão
@@ -16,15 +17,16 @@ import {
   Spinner, Stack, Tab, Table, TableContainer, TabList, TabPanel, TabPanels, Tabs, Tbody, Td, Text, Th, Thead, Tr, useToast,
 } from "@chakra-ui/react";
 import { SearchIcon } from "@chakra-ui/icons";
-import { CircleArrowDown, CircleArrowUp, FileSpreadsheet, Upload } from "lucide-react";
+import { CircleArrowDown, CircleArrowUp, FileSpreadsheet, Sparkles, Upload } from "lucide-react";
+import { Link as RouterLink } from "react-router-dom";
 
 import { Titulo } from "../Titulos/Titulos";
 import { usePermissoes } from "../../Components/permissoes";
 import { formatarDataHora, formatarDataIso } from "../../Components/config";
 import { formatarMoeda } from "../Financeiro/ConfigFinanceiro";
 import {
-  ExtratoJaEnviado, apiMovimentacoes, formatarDocumento, nomeMes, numero,
-  type Extrato, type ListaMovimentacoes, type ResultadoImportacao,
+  ExtratoJaEnviado, apiMovimentacoes, apiPlano, formatarDocumento, nomeMes, numero,
+  type Extrato, type GrupoPlano, type ListaMovimentacoes, type Movimentacao, type ResultadoImportacao,
 } from "./ConfigMovimentacoes";
 import { Favorecidos, FluxoCaixa, Saldos } from "./Resumos";
 import { Previsao } from "./Previsao";
@@ -32,6 +34,23 @@ import { Contas } from "./Contas";
 import { Investimentos } from "./Investimentos";
 
 const estiloTh = { textTransform: "none" as const, letterSpacing: "normal", fontSize: "xs", fontWeight: "medium", color: "gray.500" };
+
+// escolha da categoria: só os grupos que combinam com o tipo (saída: despesa; entrada: receita) + movimentações internas
+const SeletorCategoria = ({ m, plano, aoEscolher }: { m: Movimentacao; plano: GrupoPlano[]; aoEscolher: (id: string | null) => void }) => {
+  const combina = m.tipo === "SAIDA" ? "DESPESA" : "RECEITA";
+  const grupos = plano.filter((g) => g.tipo === combina || g.tipo === "TRANSFERENCIA" || g.categorias.some((c) => c.id === m.categoria_id));
+  return (
+    <Select size="xs" borderRadius="md" bg="white" minWidth="190px" value={m.categoria_id ?? ""} onChange={(e) => aoEscolher(e.target.value || null)}
+      borderColor={m.categoria_id ? "gray.200" : "orange.300"} color={m.categoria_id ? "gray.800" : "orange.600"}>
+      <option value="">— classificar —</option>
+      {grupos.map((g) => (
+        <optgroup key={g.id} label={g.nome}>
+          {g.categorias.filter((c) => c.ativo || c.id === m.categoria_id).map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+        </optgroup>
+      ))}
+    </Select>
+  );
+};
 
 const Total = ({ rotulo, valor, cor, icone }: { rotulo: string; valor: number; cor: string; icone?: typeof CircleArrowUp }) => (
   <Box bg="white" border="1px solid" borderColor="gray.100" borderRadius="xl" padding={4}>
@@ -51,30 +70,34 @@ export const Movimentacoes = () => {
   const [meses, setMeses] = useState<{ mes: string; quantidade: number }[]>([]);
   const [mes, setMes] = useState("");          // "" = todas
   const [tipo, setTipo] = useState("");        // "" | ENTRADA | SAIDA
+  const [categoria, setCategoria] = useState(""); // "" = todas | SEM | id da categoria ou do grupo
   const [busca, setBusca] = useState("");
   const [dados, setDados] = useState<ListaMovimentacoes | null>(null);
   const [extratos, setExtratos] = useState<Extrato[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoImportacao | null>(null);
+  const [plano, setPlano] = useState<GrupoPlano[]>([]);
+  const [classificando, setClassificando] = useState(false);
   const [versao, setVersao] = useState(0); // muda a cada envio/exclusão: recarrega as abas de resumo
 
   const erro = useCallback((e: unknown, padrao: string) => toast({ title: e instanceof Error ? e.message : padrao, status: "error", duration: 7000 }), [toast]);
 
   const carregarAuxiliares = useCallback(async () => {
     try {
-      const [listaMeses, listaExtratos] = await Promise.all([apiMovimentacoes.meses(), apiMovimentacoes.extratos()]);
+      const [listaMeses, listaExtratos, listaPlano] = await Promise.all([apiMovimentacoes.meses(), apiMovimentacoes.extratos(), apiPlano.listar()]);
       setMeses(listaMeses);
       setExtratos(listaExtratos);
+      setPlano(listaPlano);
     } catch (e) { erro(e, "Erro ao carregar os meses"); }
   }, [erro]);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
-    try { setDados(await apiMovimentacoes.listar(mes, tipo)); }
+    try { setDados(await apiMovimentacoes.listar(mes, tipo, categoria)); }
     catch (e) { erro(e, "Erro ao carregar as movimentações"); }
     finally { setCarregando(false); }
-  }, [mes, tipo, erro]);
+  }, [mes, tipo, categoria, erro]);
 
   useEffect(() => { if (veFinanceiroTudo) carregarAuxiliares(); }, [carregarAuxiliares, veFinanceiroTudo]);
   useEffect(() => { if (veFinanceiroTudo) carregar(); }, [carregar, veFinanceiroTudo]);
@@ -102,6 +125,29 @@ export const Movimentacoes = () => {
       setVersao((v) => v + 1);
     } catch (e) { erro(e, "Erro ao importar o extrato"); }
     finally { setEnviando(false); if (entrada.current) entrada.current.value = ""; }
+  }
+
+  const nomesCategorias = useMemo(() => new Map(plano.flatMap((g) => g.categorias.map((c) => [c.id, c.nome] as const))), [plano]);
+
+  async function escolherCategoria(m: Movimentacao, categoria_id: string | null) {
+    setDados((d) => d && { ...d, itens: d.itens.map((x) => (x.id === m.id ? { ...x, categoria_id } : x)) });
+    try {
+      const r = await apiMovimentacoes.classificar(m.id, categoria_id);
+      if (r.semelhantes > 0) {
+        toast({ title: `Mais ${r.semelhantes} lançamento(s) do mesmo favorecido classificados`, status: "success", duration: 3000 });
+        await carregar();
+      }
+    } catch (e) { erro(e, "Erro ao classificar"); await carregar(); }
+  }
+
+  async function classificarPendentes() {
+    setClassificando(true);
+    try {
+      const r = await apiMovimentacoes.classificarPendentes();
+      toast({ title: r.classificadas ? `${r.classificadas} lançamento(s) classificados` : "Nenhum lançamento novo para classificar (classifique um à mão para o sistema aprender)", status: r.classificadas ? "success" : "info" });
+      await carregar();
+    } catch (e) { erro(e, "Erro ao classificar"); }
+    finally { setClassificando(false); }
   }
 
   async function excluirExtrato(ex: Extrato) {
@@ -189,11 +235,36 @@ export const Movimentacoes = () => {
             <option value="ENTRADA">Só entradas</option>
             <option value="SAIDA">Só saídas</option>
           </Select>
+          {plano.length > 0 && (
+            <Select maxWidth={{ md: "260px" }} bg="white" borderRadius="lg" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+              <option value="">Todas as categorias</option>
+              <option value="SEM">Sem categoria</option>
+              {plano.map((g) => (
+                <optgroup key={g.id} label={g.nome}>
+                  <option value={g.id}>{g.nome} (todas)</option>
+                  {g.categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}{c.ativo ? "" : " (inativa)"}</option>)}
+                </optgroup>
+              ))}
+            </Select>
+          )}
           <InputGroup maxWidth={{ md: "340px" }}>
             <InputLeftElement pointerEvents="none"><SearchIcon color="gray.400" boxSize={3.5} /></InputLeftElement>
             <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar lançamento, favorecido ou CPF/CNPJ" bg="white" borderRadius="lg" />
           </InputGroup>
+          {editaTudo && plano.length > 0 && (
+            <Button variant="outline" colorScheme="blue" borderRadius="lg" flexShrink={0} marginLeft={{ md: "auto" }} leftIcon={<Icon as={Sparkles} boxSize={4} />}
+              isLoading={classificando} onClick={classificarPendentes}>Classificar automaticamente</Button>
+          )}
         </Flex>
+
+        {meses.length > 0 && plano.length === 0 && (
+          <Alert status="info" borderRadius="lg" marginBottom={4}>
+            <AlertIcon />
+            <AlertDescription fontSize="sm">
+              Crie o <Text as={RouterLink} to="/PlanoContas" color="blue.600" fontWeight="semibold" textDecoration="underline">plano de contas</Text> para classificar cada lançamento por categoria (salários, água, energia...).
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* TOTAIS */}
         {dados && (
@@ -224,6 +295,7 @@ export const Movimentacoes = () => {
                     <Th {...estiloTh}>Razão social</Th>
                     <Th {...estiloTh}>CPF/CNPJ</Th>
                     <Th {...estiloTh}>Tipo</Th>
+                    {plano.length > 0 && <Th {...estiloTh}>Categoria</Th>}
                     <Th {...estiloTh} isNumeric paddingRight={5}>Valor</Th>
                   </Tr>
                 </Thead>
@@ -235,6 +307,13 @@ export const Movimentacoes = () => {
                       <Td fontSize="sm" maxWidth="280px" whiteSpace="normal" color={m.razao_social ? "gray.800" : "gray.400"}>{m.razao_social ?? "—"}</Td>
                       <Td fontSize="xs" color="gray.600">{formatarDocumento(m.cpf_cnpj) || "—"}</Td>
                       <Td><Badge colorScheme={m.tipo === "ENTRADA" ? "green" : "red"} variant="subtle" textTransform="none">{m.tipo === "ENTRADA" ? "Entrada" : "Saída"}</Badge></Td>
+                      {plano.length > 0 && (
+                        <Td>
+                          {editaTudo
+                            ? <SeletorCategoria m={m} plano={plano} aoEscolher={(id) => escolherCategoria(m, id)} />
+                            : <Text fontSize="xs" color={m.categoria_id ? "gray.700" : "gray.400"}>{(m.categoria_id && nomesCategorias.get(m.categoria_id)) || "—"}</Text>}
+                        </Td>
+                      )}
                       <Td isNumeric paddingRight={5} fontSize="sm" fontWeight="semibold" color={m.tipo === "ENTRADA" ? "green.600" : "red.600"}>{formatarMoeda(numero(m.valor))}</Td>
                     </Tr>
                   ))}

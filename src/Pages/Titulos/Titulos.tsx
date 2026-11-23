@@ -1,103 +1,12 @@
 import { useAuth } from "../Login/useAuth";
 import { ROTULOS_PERFIL, type PerfilPessoa } from "../Pessoas/ConfigPessoas";
 import { usePermissoes } from "../../Components/permissoes";
-import {Badge,Box,Button,Collapse,Drawer,DrawerBody,DrawerCloseButton,DrawerContent,DrawerHeader,DrawerOverlay,Flex,Heading,Icon,IconButton,Select,Text,Tooltip,VStack,useDisclosure} from "@chakra-ui/react";
-import { useEffect, useState, type ElementType, type ReactNode } from "react";
-import {Link as RouterLink,useLocation,useNavigate} from "react-router-dom";
-import {Briefcase,Car,Landmark,ChartPie,Receipt,Wrench,Handshake,ChevronDown,ClipboardList,Settings,HardDrive,LayoutDashboard,UserCog,CarFront,DoorOpen,Home,KeyRound,ListChecks,LogOut,Megaphone,Menu as MenuIcon,MessageCircle,MessageSquare,Users,Wallet} from "lucide-react";
-
-export const ROTAS = {
-  INICIO: "/",
-  LOGIN: "/login",
-  APARTAMENTOS: "/Apartamentos",
-  VAGAS: "/Vagas",
-  VEICULOS: "/Veiculos",
-  PESSOA: "/Pessoas",
-  CONDOMINIOS: "/Condominios",
-  USUARIOS: "/Usuarios",
-  FINANCEIRO: "/Financeiro",
-  AVISOS: "/Avisos",
-  ATENDIMENTO: "/Atendimento",
-  TAREFAS: "/Tarefas",
-  TROCAR_SENHA: "/TrocarSenha",
-  WHATSAPP: "/WhatsApp",
-  ADMINISTRACAO: "/Administracao",
-  DRIVE: "/Drive",
-  MOVIMENTACOES: "/Movimentacoes",
-  FRACAO_IDEAL: "/FracaoIdeal",
-  MANUTENCOES: "/Manutencoes",
-  PRESTADORES: "/Prestadores",
-} as const;
-
-const DadosTitulos = {
-  [ROTAS.INICIO]: {titulo: "Dashboard",descricao: "Visão geral do condomínio."},
-  [ROTAS.APARTAMENTOS]: {titulo: "Apartamentos",descricao: "Unidades, moradores, vagas e veículos.",},
-  [ROTAS.VAGAS]: {titulo: "Vagas",descricao: "Vagas fixas e rotativas.",},
-  [ROTAS.VEICULOS]: {titulo: "Veículos",descricao: "Veículos, vagas e condutores.",},
-  [ROTAS.PESSOA]: {titulo: "Pessoas",descricao: "Moradores, prestadores e equipe.",},
-  [ROTAS.CONDOMINIOS]: {titulo: "Painel do sistema",descricao: "Todos os condomínios e seus síndicos.",},
-  [ROTAS.USUARIOS]: {titulo: "Usuários",descricao: "Logins de todo o sistema.",},
-  [ROTAS.FINANCEIRO]: {titulo: "Financeiro",descricao: "Cotas condominiais.",},
-  [ROTAS.AVISOS]: {titulo: "Avisos",descricao: "Quadro de avisos do condomínio.",},
-  [ROTAS.ATENDIMENTO]: {titulo: "Atendimento",descricao: "Conversas com a administração.",},
-  [ROTAS.TAREFAS]: {titulo: "Tarefas",descricao: "Tarefas da administração e responsáveis.",},
-  [ROTAS.TROCAR_SENHA]: {titulo: "Minha conta",descricao: "Troca de senha.",},
-  [ROTAS.MOVIMENTACOES]: {titulo: "Conta bancária",descricao: "Extrato, investimentos, fluxo de caixa e previsão.",},
-  [ROTAS.FRACAO_IDEAL]: {titulo: "Fração ideal",descricao: "Participação de cada unidade no rateio.",},
-  [ROTAS.MANUTENCOES]: {titulo: "Manutenções",descricao: "Vencimentos de manutenções e renovações.",},
-  [ROTAS.PRESTADORES]: {titulo: "Prestadores",descricao: "Funcionários, fornecedores e prestadores.",},
-  [ROTAS.DRIVE]: {titulo: "Arquivos",descricao: "Arquivos do sistema no Google Drive.",},
-  [ROTAS.ADMINISTRACAO]: {titulo: "Administração geral",descricao: "Síndicos, moradores e responsáveis.",},
-  [ROTAS.WHATSAPP]: {titulo: "WhatsApp",descricao: "Mensagens recebidas no número do sistema.",},
-};
-
-// ITEM DO MENU (destaca a página atual)
-const ItemMenu = ({ para, icone, children }: { para: string; icone: ElementType; children: ReactNode }) => {
-  const { pathname } = useLocation();
-  const ativo = para === ROTAS.INICIO ? pathname === para : pathname.toLowerCase().startsWith(para.toLowerCase());
-  return (
-    <Button as={RouterLink} to={para} variant={ativo ? "solid" : "ghost"} colorScheme={ativo ? "blue" : undefined} bg={ativo ? "blue.50" : undefined}
-      color={ativo ? "blue.700" : undefined} size="sm" justifyContent="flex-start" leftIcon={<Icon as={icone} boxSize={4} />} fontWeight={ativo ? "semibold" : "medium"}>
-      {children}
-    </Button>
-  );
-};
-
-// TÓPICO DO MENU: abre e fecha como leque; abre sozinho se a página atual está nele
-const CHAVE_MENU = "menu_topicos_abertos";
-
-function lerAbertos(): Record<string, boolean> {
-  try { return JSON.parse(localStorage.getItem(CHAVE_MENU) ?? "{}"); } catch { return {}; }
-}
-
-const Grupo = ({ id, titulo, icone, rotas, children }: { id: string; titulo: string; icone: ElementType; rotas: string[]; children: ReactNode }) => {
-  const { pathname } = useLocation();
-  const contemAtual = rotas.some((r) => pathname.toLowerCase().startsWith(r.toLowerCase()));
-  const [aberto, setAberto] = useState<boolean>(() => lerAbertos()[id] ?? contemAtual);
-
-  useEffect(() => { if (contemAtual) setAberto(true); }, [contemAtual]);
-
-  function alternar() {
-    const novo = !aberto;
-    setAberto(novo);
-    try { localStorage.setItem(CHAVE_MENU, JSON.stringify({ ...lerAbertos(), [id]: novo })); } catch { /* sem localStorage */ }
-  }
-
-  return (
-    <Box>
-      <Button variant="ghost" size="sm" width="100%" justifyContent="space-between" onClick={alternar} aria-expanded={aberto}
-        color={contemAtual ? "blue.700" : "gray.700"} fontWeight="semibold"
-        leftIcon={<Icon as={icone} boxSize={4} />} rightIcon={<Icon as={ChevronDown} boxSize={4} transition="transform 0.2s" transform={aberto ? "rotate(180deg)" : undefined} />}>
-        <Text as="span" flex={1} textAlign="left">{titulo}</Text>
-      </Button>
-      <Collapse in={aberto} animateOpacity>
-        <VStack align="stretch" spacing={1} paddingLeft={4} marginLeft={3} marginTop={1} borderLeft="1px solid" borderColor="gray.100">
-          {children}
-        </VStack>
-      </Collapse>
-    </Box>
-  );
-};
+import { Badge, Box, Drawer, DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader, DrawerOverlay, Flex, Heading, Icon, IconButton,  Select, Text, Tooltip, VStack, useDisclosure } from "@chakra-ui/react";
+import { useEffect } from "react";
+import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
+import { Briefcase, Car, CarFront, ChartPie, ClipboardList, DoorOpen, Handshake, HardDrive, Home, KeyRound, Landmark, LayoutDashboard,ListChecks, ListTree, LogOut, Megaphone, Menu as MenuIcon, MessageCircle, MessageSquare, Receipt, Settings, UserCog, Users, Wallet, Wrench} from "lucide-react";
+import { ROTAS, DadosTitulos } from "./Dados";
+import { Grupo, ItemMenu } from "./OrganizaGrupo";
 
 export const Titulo = () => {
   const { pathname } = useLocation();
@@ -105,26 +14,18 @@ export const Titulo = () => {
   const { user, logout, condominioAtual, trocarCondominio } = useAuth();
   const permissoes = usePermissoes();
   const menuCelular = useDisclosure();
-  useEffect(() => { menuCelular.onClose(); }, [pathname]); // fecha a gaveta ao trocar de página
-  // página exata ou subpágina (ex.: /Apartamentos/123 usa o título de /Apartamentos)
-  const chave = (Object.keys(DadosTitulos) as (keyof typeof DadosTitulos)[])
-    .filter((rota) => rota !== ROTAS.INICIO)
-    .find((rota) => pathname.toLowerCase().startsWith(rota.toLowerCase()))
-    ?? (pathname === ROTAS.INICIO ? ROTAS.INICIO : undefined);
-  const pagina = chave ? DadosTitulos[chave] : undefined;
-  if (!pagina) return null;
+  useEffect(() => { menuCelular.onClose(); }, [pathname]);
+  const chave = (Object.keys(DadosTitulos) as (keyof typeof DadosTitulos)[]).filter((rota) => rota !== ROTAS.INICIO).find((rota) => pathname.toLowerCase().startsWith(rota.toLowerCase()))?? (pathname === ROTAS.INICIO ? ROTAS.INICIO : undefined);
+  const pagina = chave ? DadosTitulos[chave] : undefined; if (!pagina) return null;
   function sair() {logout(); navigate(ROTAS.LOGIN)}
-
   const ehAdm = Boolean(user?.admin_sistema);
   const veWhatsApp = ehAdm || Boolean(user?.responsavel) || Boolean(user?.condominios.some((c) => c.perfil === "SINDICO"));
   const veManutencoes = Boolean(condominioAtual) && permissoes.veTudo;
   const vePrestadores = Boolean(condominioAtual) && permissoes.veFinanceiroTudo;
   const veDrive = ehAdm || permissoes.editaTudo;
-  // cada tópico só aparece se tiver ao menos um item visível
   const mostraComunicacao = Boolean(condominioAtual) || veWhatsApp;
   const mostraFinanceiro = permissoes.acessaFinanceiro || permissoes.veFinanceiroTudo;
   const mostraGestao = permissoes.acessaTarefas || veManutencoes || vePrestadores || veDrive;
-
   const icones = (
     <Flex gap={1} flexShrink={0}>
       <Tooltip label="Trocar senha">
@@ -136,7 +37,6 @@ export const Titulo = () => {
     </Flex>
   );
 
-  // condomínio atual + os tópicos do menu (usado no desktop e na gaveta do celular)
   const conteudo = (
     <>
       {user && user.condominios.length > 0 && (
@@ -144,13 +44,8 @@ export const Titulo = () => {
           <Text fontSize="xs" color="gray.500" marginBottom={1}>Condomínio</Text>
           {user.condominios.length > 1 ? (
             <Select size="sm" value={condominioAtual?.id ?? ""} onChange={(e) => trocarCondominio(e.target.value)}>
-              {user.condominios.map((condominio) => (
-                <option key={condominio.id} value={condominio.id}>{condominio.nome}</option>
-              ))}
-            </Select>
-          ) : (
-            <Text fontSize="sm" fontWeight="semibold" color="gray.800">{condominioAtual?.nome}</Text>
-          )}
+              {user.condominios.map((condominio) => (<option key={condominio.id} value={condominio.id}>{condominio.nome}</option>))}
+            </Select> ) : ( <Text fontSize="sm" fontWeight="semibold" color="gray.800">{condominioAtual?.nome}</Text> )}
           {condominioAtual && <Badge marginTop={2} colorScheme="blue" textTransform="none">{condominioAtual.perfil === "ADM" ? "Administrador" : ROTULOS_PERFIL[condominioAtual.perfil as PerfilPessoa]}</Badge>}
         </Box>
       )}
@@ -178,9 +73,10 @@ export const Titulo = () => {
 
         {/* FINANCEIRO */}
         {mostraFinanceiro && (
-          <Grupo id="financeiro" titulo="Financeiro" icone={Wallet} rotas={[ROTAS.FINANCEIRO, ROTAS.MOVIMENTACOES, ROTAS.FRACAO_IDEAL]}>
+          <Grupo id="financeiro" titulo="Financeiro" icone={Wallet} rotas={[ROTAS.FINANCEIRO, ROTAS.MOVIMENTACOES, ROTAS.PLANO_CONTAS, ROTAS.FRACAO_IDEAL]}>
             {permissoes.acessaFinanceiro && <ItemMenu para={ROTAS.FINANCEIRO} icone={Receipt}>Cotas condominiais</ItemMenu>}
             {permissoes.veFinanceiroTudo && <ItemMenu para={ROTAS.MOVIMENTACOES} icone={Landmark}>Conta bancária</ItemMenu>}
+            {permissoes.veFinanceiroTudo && <ItemMenu para={ROTAS.PLANO_CONTAS} icone={ListTree}>Plano de contas</ItemMenu>}
             {permissoes.veFinanceiroTudo && <ItemMenu para={ROTAS.FRACAO_IDEAL} icone={ChartPie}>Fração ideal</ItemMenu>}
           </Grupo>
         )}
@@ -211,8 +107,7 @@ export const Titulo = () => {
   return (
     <>
       {/* CELULAR: barra no topo + menu em gaveta */}
-      <Flex display={{ base: "flex", md: "none" }} position="sticky" top={0} zIndex={20} width="100%" align="center" gap={2}
-        bg="white" borderBottom="1px solid" borderColor="gray.100" boxShadow="sm" paddingX={3} paddingY={2}>
+      <Flex display={{ base: "flex", md: "none" }} position="sticky" top={0} zIndex={20} width="100%" align="center" gap={2}bg="white" borderBottom="1px solid" borderColor="gray.100" boxShadow="sm" paddingX={3} paddingY={2}>
         <IconButton aria-label="Abrir menu" size="sm" variant="ghost" icon={<Icon as={MenuIcon} boxSize={5} />} onClick={menuCelular.onOpen} />
         <Box flex={1} minWidth={0}>
           <Text fontWeight="semibold" color="gray.800" noOfLines={1}>{pagina.titulo}</Text>
@@ -245,6 +140,7 @@ export const Titulo = () => {
         </Box>
         {conteudo}
       </Flex>
+
     </>
   );
 };

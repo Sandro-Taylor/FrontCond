@@ -24,9 +24,10 @@ import { Movimentacoes } from "./Pages/Movimentacoes/Movimentacoes";
 import { FracaoIdeal } from "./Pages/FracaoIdeal/FracaoIdeal";
 import { Manutencoes } from "./Pages/Manutencoes/Manutencoes";
 import { Prestadores } from "./Pages/Prestadores/Prestadores";
+import { PlanoContas } from "./Pages/PlanoContas/PlanoContas";
 import { PopupWhatsApp } from "./Pages/WhatsApp/PopupWhatsApp";
 
-import { ROTAS } from "./Pages/Titulos/Titulos";
+import { ROTAS } from "./Pages/Titulos/Dados";
 
 
 interface ProtectedProps {
@@ -193,6 +194,11 @@ export const RoutesApp = () => {
         <Route
           path={ROTAS.MANUTENCOES}
           element={<Protected Item={Manutencoes} exigeCondominio exige="veTudo" />}
+        />
+
+        <Route
+          path={ROTAS.PLANO_CONTAS}
+          element={<Protected Item={PlanoContas} exigeCondominio exige="veFinanceiroTudo" />}
         />
 
         <Route

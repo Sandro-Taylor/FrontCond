@@ -79,6 +79,8 @@ export const apiWhatsApp = {
     chamarApi<ConversaDetalhe>(`/whatsapp/conversas/${id}/mensagens`, "POST", "Não foi possível enviar a mensagem.", { texto }),
   assumir: (id: string) => chamarApi<ConversaDetalhe>(`/whatsapp/conversas/${id}/assumir`, "POST", "Não foi possível assumir a conversa."),
   devolver: (id: string) => chamarApi<ConversaDetalhe>(`/whatsapp/conversas/${id}/devolver`, "POST", "Não foi possível devolver ao robô."),
+  robo: () => chamarApi<{ ativo: boolean }>("/whatsapp/robo", "GET", "Não foi possível consultar o robô."),
+  ligarRobo: (ativo: boolean) => chamarApi<{ ativo: boolean }>("/whatsapp/robo", "PUT", "Não foi possível alterar o robô.", { ativo }),
   novidades: (desde: string | null) =>
     chamarApi<Novidades>(`/whatsapp/novidades${desde ? `?desde=${encodeURIComponent(desde)}` : ""}`, "GET", "Não foi possível consultar novas mensagens."),
 };

@@ -12,7 +12,7 @@ import {
   Box, Button, Flex, Icon, Input, InputGroup, InputLeftElement, Select, SimpleGrid, Spinner, Text, useDisclosure, useToast,
 } from "@chakra-ui/react";
 import { AddIcon, RepeatIcon, SearchIcon, SettingsIcon } from "@chakra-ui/icons";
-import { Wallet } from "lucide-react";
+import { Receipt, Wallet } from "lucide-react";
 
 import { Titulo } from "../Titulos/Titulos";
 import { usePermissoes } from "../../Components/permissoes";
@@ -24,6 +24,8 @@ import {
 } from "./ConfigFinanceiro";
 import { ModalConfiguracao, ModalCota, ModalGerarCotas, ModalPagamento } from "./ModaisFinanceiro";
 import { TabelaCotas, type AcaoCota } from "./TabelaCotas";
+import { ModalTaxasExtras } from "./TaxasExtras";
+import { ModalPix } from "./ModalPix";
 
 type FiltroSituacao = "TODAS" | SituacaoCota;
 
@@ -44,6 +46,7 @@ export const Financeiro = () => {
   const modalGerar = useDisclosure();
   const modalCota = useDisclosure();
   const modalPagamento = useDisclosure();
+  const modalTaxas = useDisclosure();
 
   // quem vê tudo abre no mês atual; o morador vê todo o histórico da unidade
   const [competencia, setCompetencia] = useState(permissoes.veFinanceiroTudo ? mesAtual() : "");
@@ -54,6 +57,7 @@ export const Financeiro = () => {
   const [busca, setBusca] = useState("");
   const [situacao, setSituacao] = useState<FiltroSituacao>("TODAS");
   const [cotaSelecionada, setCotaSelecionada] = useState<Cota | null>(null);
+  const [cotaPix, setCotaPix] = useState<Cota | null>(null);
 
   const erro = useCallback((e: unknown, padrao: string) => {
     toast({ title: e instanceof Error ? e.message : padrao, status: "error" });
@@ -155,14 +159,18 @@ export const Financeiro = () => {
             </Text>
             {configuracao && (
               <Text fontSize="xs" color="gray.400" marginTop={1}>
-                Cota padrão {configuracao.valor_cota ? formatarMoeda(configuracao.valor_cota) : "não definida"} · vence dia {configuracao.dia_vencimento}
-                {" "}· multa {configuracao.multa_percentual}% · juros {configuracao.juros_mensal}% ao mês
+                {configuracao.rateio_forma === "DESPESAS" ? "Rateio das despesas do mês anterior"
+                  : configuracao.rateio_forma === "ORCAMENTO" ? `Orçamento de ${formatarMoeda(configuracao.orcamento_mensal ?? 0)} rateado`
+                  : `Cota fixa ${configuracao.valor_cota ? formatarMoeda(configuracao.valor_cota) : "não definida"}`}
+                {configuracao.fundo_reserva_percentual > 0 && ` + ${configuracao.fundo_reserva_percentual}% fundo de reserva`}
+                {" "}· vence dia {configuracao.dia_vencimento} · multa {configuracao.multa_percentual}% · juros {configuracao.juros_mensal}% ao mês
               </Text>
             )}
           </Box>
           {permissoes.editaTudo && (
             <Flex gap={2} wrap="wrap">
               <Button variant="outline" borderRadius="lg" leftIcon={<SettingsIcon boxSize={3} />} onClick={modalConfig.onOpen}>Configurar</Button>
+              <Button variant="outline" borderRadius="lg" leftIcon={<Icon as={Receipt} boxSize={4} />} onClick={modalTaxas.onOpen}>Taxas extras</Button>
               <Button variant="outline" borderRadius="lg" leftIcon={<RepeatIcon boxSize={3} />} onClick={modalGerar.onOpen}>Gerar cotas do mês</Button>
               <Button colorScheme="blue" borderRadius="lg" leftIcon={<AddIcon boxSize={2.5} />} onClick={novaCota}>Lançar cota</Button>
             </Flex>
@@ -211,8 +219,10 @@ export const Financeiro = () => {
             <Button marginTop={4} size="sm" onClick={() => { setBusca(""); setSituacao("TODAS"); }}>Limpar filtros</Button>
           </Flex>
         ) : (
-          <TabelaCotas cotas={filtradas} aoAcao={permissoes.editaTudo ? aoAcao : undefined} />
+          <TabelaCotas cotas={filtradas} aoAcao={permissoes.editaTudo ? aoAcao : undefined} aoPix={setCotaPix} />
         )}
+
+        <ModalPix cota={cotaPix} aoFechar={() => setCotaPix(null)} />
 
         {permissoes.editaTudo && (
           <>
@@ -221,6 +231,7 @@ export const Financeiro = () => {
             <ModalCota aberto={modalCota.isOpen} aoFechar={modalCota.onClose} cota={cotaSelecionada} apartamentos={apartamentos}
               configuracao={configuracao} competenciaInicial={competencia} aoCriar={criarCota} aoEditar={editarCota} />
             <ModalPagamento aberto={modalPagamento.isOpen} aoFechar={modalPagamento.onClose} cota={cotaSelecionada} aoPagar={pagarCota} />
+            <ModalTaxasExtras aberto={modalTaxas.isOpen} aoFechar={modalTaxas.onClose} podeEditar={permissoes.editaTudo} />
           </>
         )}
       </Box>

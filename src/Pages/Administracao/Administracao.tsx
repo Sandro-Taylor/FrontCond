@@ -1,24 +1,11 @@
-// ---------------------------------------------------------
-// ADMINISTRAÇÃO GERAL (só ADM do sistema)
-// ---------------------------------------------------------
-// Aba Condomínios: todos os condomínios; ao escolher um,
-//   aparecem todos os apartamentos com as pessoas ligadas e
-//   tudo o que o sistema tem sobre elas. O ADM edita os dados
-//   direto na tela (clique no campo) e define o RESPONSÁVEL do
-//   WhatsApp de cada pessoa (padrão: o síndico do prédio).
-// Aba Responsáveis: cria quem atende o WhatsApp sem estar
-//   ligado a condomínio ou apartamento (Responsaveis.tsx).
-// ---------------------------------------------------------
-
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link as RouterLink } from "react-router-dom";
-import {
-  Accordion, AccordionButton, AccordionIcon, AccordionItem, AccordionPanel, Badge, Box, Button, Checkbox, Flex, Input, InputGroup,
-  InputLeftElement, Select, SimpleGrid, Spinner, Stack, Tab, TabList, TabPanel, TabPanels, Tabs, Text, useToast,
-} from "@chakra-ui/react";
+import { Accordion, AccordionButton, AccordionIcon, AccordionItem, AccordionPanel, Badge, Box, Button, Checkbox, Flex, Input, InputGroup,
+  InputLeftElement, Select, SimpleGrid, Spinner, Stack, Tab, TabList, TabPanel, TabPanels, Tabs, Text, useToast } from "@chakra-ui/react";
 import { SearchIcon } from "@chakra-ui/icons";
 
-import { Titulo, ROTAS } from "../Titulos/Titulos";
+import { Titulo } from "../Titulos/Titulos";
+import { ROTAS } from "../Titulos/Dados";
 import { useAuth } from "../Login/useAuth";
 import { CelulaEditavel } from "../../Components/CelulaEditavel";
 import { FotoPessoa } from "../../Components/Arquivos";
@@ -27,9 +14,7 @@ import { ROTULOS_PERFIL, descreverVinculo } from "../Pessoas/ConfigPessoas";
 import { rotuloSindicoPadrao } from "../Pessoas/CampoResponsavel";
 import { formatarMoeda } from "../Financeiro/ConfigFinanceiro";
 import { Responsaveis } from "./Responsaveis";
-import {
-  OCUPACAO_ADMIN, apiAdministracao,
-  type ApartamentoAdmin, type CampoEditavel, type CondominioDetalhe, type CondominioVisao, type PessoaAdmin, type PessoaNaUnidade, type ResponsavelResumo,
+import { OCUPACAO_ADMIN, apiAdministracao, type ApartamentoAdmin, type CampoEditavel, type CondominioDetalhe, type CondominioVisao, type PessoaAdmin, type PessoaNaUnidade, type ResponsavelResumo,
 } from "./ConfigAdministracao";
 
 type Filtro = "TODOS" | "COM_SINDICO" | "ESCOLHIDO" | "ATRASADOS" | "CHAMADOS" | "WHATSAPP" | "VAZIOS";
@@ -70,10 +55,6 @@ function pessoaCombina(p: PessoaAdmin, filtro: Filtro, termo: string) {
   if (!termo) return true;
   return [p.nome, p.cpf ?? "", p.telefone ?? "", p.email ?? "", p.responsavel?.nome ?? "", ...p.recebe_nomes].some((t) => t.toLowerCase().includes(termo));
 }
-
-// ---------------------------------------------------------
-// CARTÃO DE UMA PESSOA (dados editáveis + responsável)
-// ---------------------------------------------------------
 
 type CartaoPessoaProps = {
   pessoa: PessoaAdmin;

@@ -13,7 +13,7 @@ import { Box, Button, CloseButton, Flex, Icon, ScaleFade, Stack, Text, Textarea,
 import { MessageCircle, Send } from "lucide-react";
 
 import { useAuth } from "../Login/useAuth";
-import { ROTAS } from "../Titulos/Titulos";
+import { ROTAS } from "../Titulos/Dados";
 import { formatarDataHora } from "../../Components/config";
 import { apiWhatsApp, formatarWhats, nomeContato, type Novidade } from "./ConfigWhatsApp";
 

@@ -3,14 +3,16 @@
 // ---------------------------------------------------------
 // Usada na página Financeiro e na página do apartamento.
 // As ações só aparecem quando a tela passa "aoAcao"
-// (síndico/ADM).
+// (síndico/ADM). "aoPix" mostra o botão "Pagar com PIX" nas
+// cotas em aberto (todos, inclusive o morador).
 // ---------------------------------------------------------
 
 import { Link as RouterLink } from "react-router-dom";
 import {
-  Badge, Box, IconButton, Link, Menu, MenuButton, MenuItem, MenuList, Table, TableContainer, Tbody, Td, Text, Th, Thead, Tr,
+  Badge, Box, Button, Icon, IconButton, Link, Menu, MenuButton, MenuItem, MenuList, Table, TableContainer, Tbody, Td, Text, Th, Thead, Tr,
 } from "@chakra-ui/react";
 import { ChevronDownIcon } from "@chakra-ui/icons";
+import { QrCode } from "lucide-react";
 
 import { formatarDataIso } from "../../Components/config";
 import {
@@ -40,9 +42,10 @@ type Props = {
   cotas: Cota[];
   mostrarApartamento?: boolean;
   aoAcao?: (acao: AcaoCota, cota: Cota) => void;
+  aoPix?: (cota: Cota) => void;
 };
 
-export const TabelaCotas = ({ cotas, mostrarApartamento = true, aoAcao }: Props) => (
+export const TabelaCotas = ({ cotas, mostrarApartamento = true, aoAcao, aoPix }: Props) => (
   <Box bg="white" borderRadius="xl" border="1px solid" borderColor="gray.100" overflow="hidden">
     <TableContainer>
       <Table size="sm">
@@ -56,6 +59,7 @@ export const TabelaCotas = ({ cotas, mostrarApartamento = true, aoAcao }: Props)
             <Th {...estiloTh}>Vencimento</Th>
             <Th {...estiloTh}>Situação</Th>
             <Th {...estiloTh}>Pagamento</Th>
+            {aoPix && <Th {...estiloTh} />}
             {aoAcao && <Th {...estiloTh} />}
           </Tr>
         </Thead>
@@ -94,6 +98,15 @@ export const TabelaCotas = ({ cotas, mostrarApartamento = true, aoAcao }: Props)
                     </>
                   ) : "-"}
                 </Td>
+                {aoPix && (
+                  <Td>
+                    {cota.status === "ABERTA" && (
+                      <Button size="xs" colorScheme="green" variant="outline" leftIcon={<Icon as={QrCode} boxSize={3.5} />} onClick={() => aoPix(cota)}>
+                        Pagar com PIX
+                      </Button>
+                    )}
+                  </Td>
+                )}
                 {aoAcao && (
                   <Td>
                     <Menu placement="bottom-end">
